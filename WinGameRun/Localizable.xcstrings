@@ -3696,24 +3696,24 @@
         }
       }
     },
-    "config.cjkFonts.install" : {
+    "config.cjkFonts.reinstall" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Install Fonts"
+            "value" : "Reinstall Fonts"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装字体"
+            "value" : "重新安装字体"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安裝字體"
+            "value" : "重新安裝字體"
           }
         }
       }
@@ -5080,7 +5080,7 @@
         }
       }
     },
-    "config.enhacnedSync.esync" : {
+    "config.enhancedSync.esync" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -5216,7 +5216,7 @@
         }
       }
     },
-    "config.enhacnedSync.msync" : {
+    "config.enhancedSync.msync" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
