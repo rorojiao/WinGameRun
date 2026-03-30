@@ -395,4 +395,54 @@ extension Wine {
     public static func changeWinVersion(bottle: Bottle, win: WinVersion) async throws -> String {
         return try await Wine.runWine(["winecfg", "-v", win.rawValue], bottle: bottle)
     }
+
+    /// 将 macOS 系统 CJK 字体复制到 Bottle，并注册注册表项，修复中文乱码
+    public static func installCJKFonts(bottle: Bottle) async throws {
+        let winFontsDir = bottle.url
+            .appending(path: "drive_c")
+            .appending(path: "windows")
+            .appending(path: "Fonts")
+
+        try FileManager.default.createDirectory(at: winFontsDir, withIntermediateDirectories: true)
+
+        // macOS 系统自带 CJK 字体候选列表（源路径 → 目标文件名）
+        let candidates: [(String, String)] = [
+            ("/System/Library/Fonts/STHeiti Light.ttc", "STHeitiSCLight.ttc"),
+            ("/System/Library/Fonts/STHeiti Medium.ttc", "STHeitiSCMedium.ttc"),
+            ("/Library/Fonts/Arial Unicode.ttf", "ArialUnicode.ttf"),
+            ("/System/Library/Fonts/Supplemental/Songti.ttc", "Songti.ttc")
+        ]
+
+        let fm = FileManager.default
+        var installed: [(String, String)] = [] // (字体文件名, 注册表显示名)
+        for (src, dest) in candidates {
+            guard fm.fileExists(atPath: src) else { continue }
+            let destURL = winFontsDir.appending(path: dest)
+            if fm.fileExists(atPath: destURL.path(percentEncoded: false)) {
+                try fm.removeItem(at: destURL)
+            }
+            try fm.copyItem(at: URL(fileURLWithPath: src), to: destURL)
+            installed.append((dest, dest.replacingOccurrences(of: ".ttc", with: "")
+                                        .replacingOccurrences(of: ".ttf", with: "")))
+        }
+
+        // 注册字体到 HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts
+        let fontsKey = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts"#
+        for (fileName, displayName) in installed {
+            try await addRegistryKey(
+                bottle: bottle, key: fontsKey,
+                name: "\(displayName) (TrueType)",
+                data: fileName, type: .string
+            )
+        }
+
+        // 字体替换：让无 CJK 字形的常用字体 fallback 到 STHeiti
+        let substKey = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion\FontSubstitutes"#
+        for fallback in ["Tahoma", "MS Shell Dlg", "MS Shell Dlg 2", "MS UI Gothic"] {
+            try await addRegistryKey(
+                bottle: bottle, key: substKey,
+                name: fallback, data: "STHeitiSCLight", type: .string
+            )
+        }
+    }
 }

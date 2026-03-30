@@ -24,6 +24,7 @@ enum LoadingState {
     case modifying
     case success
     case failed
+    case installing
 }
 
 struct ConfigView: View {
@@ -36,6 +37,7 @@ struct ConfigView: View {
     @State private var retinaModeLoadingState: LoadingState = .loading
     @State private var dpiConfigLoadingState: LoadingState = .loading
     @State private var dpiSheetPresented: Bool = false
+    @State private var cjkFontsLoadingState: LoadingState = .success
     @AppStorage("wineSectionExpanded") private var wineSectionExpanded: Bool = true
     @AppStorage("dxvkSectionExpanded") private var dxvkSectionExpanded: Bool = true
     @AppStorage("metalSectionExpanded") private var metalSectionExpanded: Bool = true
@@ -98,6 +100,21 @@ struct ConfigView: View {
                             presented: $dpiSheetPresented
                         )
                     }
+                }
+                SettingItemView(title: "config.cjkFonts", loadingState: cjkFontsLoadingState) {
+                    Button("config.cjkFonts.install") {
+                        cjkFontsLoadingState = .installing
+                        Task(priority: .userInitiated) {
+                            do {
+                                try await Wine.installCJKFonts(bottle: bottle)
+                                await MainActor.run { cjkFontsLoadingState = .success }
+                            } catch {
+                                print("安装 CJK 字体失败: \(error)")
+                                await MainActor.run { cjkFontsLoadingState = .failed }
+                            }
+                        }
+                    }
+                    .disabled(cjkFontsLoadingState == .installing)
                 }
                 if #available(macOS 15, *) {
                     Toggle(isOn: $bottle.settings.avxEnabled) {
@@ -347,7 +364,7 @@ struct SettingItemView<Content: View>: View {
 
             HStack {
                 switch loadingState {
-                case .loading, .modifying:
+                case .loading, .modifying, .installing:
                     ProgressView()
                         .progressViewStyle(.circular)
                         .controlSize(.small)
