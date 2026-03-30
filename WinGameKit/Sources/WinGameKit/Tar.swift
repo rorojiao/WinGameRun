@@ -37,7 +37,7 @@ public class Tar {
             process.waitUntilExit()
             let status = process.terminationStatus
             if status != 0 {
-                throw outputString
+                throw TarError.compressionFailed(outputString)
             }
         }
     }
@@ -58,10 +58,22 @@ public class Tar {
             process.waitUntilExit()
             let status = process.terminationStatus
             if status != 0 {
-                throw outputString
+                throw TarError.extractionFailed(outputString)
             }
         }
     }
 }
 
-extension String: @retroactive Error {}
+public enum TarError: LocalizedError {
+    case compressionFailed(String)
+    case extractionFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .compressionFailed(let output):
+            return "Tar compression failed: \(output)"
+        case .extractionFailed(let output):
+            return "Tar extraction failed: \(output)"
+        }
+    }
+}

@@ -24,7 +24,7 @@ public class Wine {
     private static let dxvkFolder: URL = WineInstaller.libraryFolder.appending(path: "DXVK")
     /// Path to the `wine` binary
     public static let wineBinary: URL = WineInstaller.binFolder.appending(path: "wine")
-    /// Parth to the `wineserver` binary
+    /// Path to the `wineserver` binary
     private static let wineserverBinary: URL = WineInstaller.binFolder.appending(path: "wineserver")
 
     /// Run a process on a executable file given by the `executableURL`
@@ -71,7 +71,7 @@ public class Wine {
         name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:]
     ) throws -> AsyncStream<ProcessOutput> {
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         fileHandle.writeInfo(for: bottle)
 
         return try runWineProcess(
@@ -86,7 +86,7 @@ public class Wine {
         name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:]
     ) throws -> AsyncStream<ProcessOutput> {
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         fileHandle.writeInfo(for: bottle)
 
         return try runWineserverProcess(
@@ -172,7 +172,7 @@ public class Wine {
     ) async throws -> String {
         var result: [String] = []
         let fileHandle = try makeFileHandle()
-        fileHandle.writeApplicaitonInfo()
+        fileHandle.writeApplicationInfo()
         var environment = environment
 
         if let bottle = bottle {
