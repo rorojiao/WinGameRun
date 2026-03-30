@@ -60,12 +60,12 @@ struct FileOpenView: View {
         .onAppear {
             // Makes sure there are more than 0 bottles.
             // Otherwise, it will crash on the nil cascade
-            if bottles.count <= 0 {
+            guard let firstBottle = bottles.first else {
                 dismiss()
                 return
             }
 
-            selection = bottles.first(where: { $0.url == currentBottle })?.url ?? bottles[0].url
+            selection = bottles.first(where: { $0.url == currentBottle })?.url ?? firstBottle.url
 
             if bottles.count == 1 {
                 // If the user only has one bottle
