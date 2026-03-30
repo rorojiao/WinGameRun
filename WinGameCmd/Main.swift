@@ -96,9 +96,10 @@ extension WinGameRun {
         @Argument var path: String
 
         mutating func run() throws {
-            // Should be sanitised
-            let bottleURL = URL(filePath: path)
-            let settings = try BottleSettings.decode(from: bottleURL)
+            let expandedPath = (path as NSString).expandingTildeInPath
+            let bottleURL = URL(fileURLWithPath: expandedPath)
+            let metadataURL = bottleURL.appending(path: "Metadata").appendingPathExtension("plist")
+            let settings = try BottleSettings.decode(from: metadataURL)
             var bottlesList = BottleData()
             bottlesList.paths.append(bottleURL)
             print("Bottle \"\(settings.name)\" added.")

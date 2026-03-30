@@ -56,7 +56,7 @@ struct WineInstallView: View {
                 await MainActor.run {
                     installing = false
                 }
-                sleep(2)
+                try? await Task.sleep(for: .seconds(2))
                 await proceed()
             }
         }

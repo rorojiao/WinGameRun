@@ -22,9 +22,8 @@ import UniformTypeIdentifiers
 
 struct ProgramView: View {
     @ObservedObject var program: Program
-    @State var programLoading: Bool = false
     @State var cachedIconImage: Image?
-    @AppStorage("configSectionExapnded") private var configSectionExpanded: Bool = true
+    @AppStorage("configSectionExpanded") private var configSectionExpanded: Bool = true
     @AppStorage("envArgsSectionExpanded") private var envArgsSectionExpanded: Bool = true
 
     var body: some View {
@@ -76,15 +75,7 @@ struct ProgramView: View {
                     }
                 }
                 Button("button.run") {
-                    programLoading = true
                     program.run()
-                }
-                .disabled(programLoading)
-                if programLoading {
-                    Spacer()
-                        .frame(width: 10)
-                    ProgressView()
-                        .controlSize(.small)
                 }
             }
             .padding()
