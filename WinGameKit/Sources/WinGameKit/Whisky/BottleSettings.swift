@@ -199,7 +199,7 @@ public struct BottleSettings: Codable, Equatable {
         set { info.pins = newValue }
     }
 
-    /// The blocked applicaitons on this bottle
+    /// The blocked applications on this bottle
     public var blocklist: [URL] {
         get { return info.blocklist }
         set { info.blocklist = newValue }
