@@ -414,7 +414,7 @@ extension Wine {
         ]
 
         let fm = FileManager.default
-        var installed: [(String, String)] = [] // (字体文件名, 注册表显示名)
+        var installed: [(fileName: String, displayName: String)] = []
         for (src, dest) in candidates {
             guard fm.fileExists(atPath: src) else { continue }
             let destURL = winFontsDir.appending(path: dest)
@@ -422,26 +422,30 @@ extension Wine {
                 try fm.removeItem(at: destURL)
             }
             try fm.copyItem(at: URL(fileURLWithPath: src), to: destURL)
-            installed.append((dest, dest.replacingOccurrences(of: ".ttc", with: "")
-                                        .replacingOccurrences(of: ".ttf", with: "")))
+            let displayName = URL(fileURLWithPath: dest).deletingPathExtension().lastPathComponent
+            installed.append((fileName: dest, displayName: displayName))
         }
+
+        guard !installed.isEmpty else { return }
 
         // 注册字体到 HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts
         let fontsKey = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts"#
-        for (fileName, displayName) in installed {
+        for font in installed {
             try await addRegistryKey(
                 bottle: bottle, key: fontsKey,
-                name: "\(displayName) (TrueType)",
-                data: fileName, type: .string
+                name: "\(font.displayName) (TrueType)",
+                data: font.fileName, type: .string
             )
         }
 
-        // 字体替换：让无 CJK 字形的常用字体 fallback 到 STHeiti
+        // 字体替换：只在 STHeitiSCLight 成功安装时才写入 FontSubstitutes
+        // 目标必须是已安装的字体，否则替换无效
+        guard let primaryFont = installed.first(where: { $0.fileName == "STHeitiSCLight.ttc" }) else { return }
         let substKey = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion\FontSubstitutes"#
         for fallback in ["Tahoma", "MS Shell Dlg", "MS Shell Dlg 2", "MS UI Gothic"] {
             try await addRegistryKey(
                 bottle: bottle, key: substKey,
-                name: fallback, data: "STHeitiSCLight", type: .string
+                name: fallback, data: primaryFont.displayName, type: .string
             )
         }
     }

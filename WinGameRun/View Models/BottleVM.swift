@@ -58,6 +58,8 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                 }
 
                 try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
+                // 自动安装 CJK 字体，修复中文乱码；字体安装失败不影响 Bottle 创建
+                try? await Wine.installCJKFonts(bottle: bottle)
                 let wineVer = try await Wine.wineVersion()
 
                 await MainActor.run {

@@ -190,46 +190,58 @@ struct BottleView: View {
         runtimeAIOLoading = true
         defer { runtimeAIOLoading = false }
         do {
-            // Download the archive
-            let urlString = "https://github.com/wingamerun/WinGameRun/raw/refs/heads/main/RuntimeAIO.tar.gz"
+            // 从 GitHub Release 下载（二进制大文件走 releases，不走 raw）
+            let urlString = "https://github.com/rorojiao/WinGameRun/releases/download/runtimes-v1/RuntimeAIO.tar.gz"
             guard let url = URL(string: urlString) else {
                 throw RuntimeAIOError.invalidURL
             }
             let dlConfig = URLSessionConfiguration.default
             dlConfig.connectionProxyDictionary = [:]
-            let (tempURL, _) = try await URLSession(configuration: dlConfig).download(from: url)
-            // Create temporary directory for extraction
+            let (tempURL, response) = try await URLSession(configuration: dlConfig).download(from: url)
+
+            // 修复：先检查 HTTP 状态码，避免把 404 HTML 页面当 tar.gz 解压
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                throw RuntimeAIOError.downloadFailed(httpResponse.statusCode)
+            }
+
             let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
             defer {
                 try? FileManager.default.removeItem(at: tempDir)
             }
-            // Extract the tar.gz file
-            let extractProcess = Process()
-            extractProcess.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-            extractProcess.arguments = ["-xzf", tempURL.path, "-C", tempDir.path]
-            try extractProcess.run()
-            extractProcess.waitUntilExit()
-            guard extractProcess.terminationStatus == 0 else {
+
+            // 修复：解压在后台线程执行，避免 @MainActor 阻塞 UI
+            let extractionOK = await Task.detached {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+                proc.arguments = ["-xzf", tempURL.path, "-C", tempDir.path]
+                do {
+                    try proc.run()
+                    proc.waitUntilExit()
+                    return proc.terminationStatus == 0
+                } catch {
+                    return false
+                }
+            }.value
+
+            guard extractionOK else {
                 throw RuntimeAIOError.extractionFailed
             }
-            // Find install_all.bat file
+
+            // 查找 install_all.bat
             let installScript = tempDir.appendingPathComponent("install_all.bat")
-            guard FileManager.default.fileExists(atPath: installScript.path) else {
-                // Try to find it recursively in subdirectories
-                if let foundScript = try findInstallScript(in: tempDir) {
-                    try await Wine.runBatchFile(url: foundScript, bottle: bottle)
-                } else {
-                    throw RuntimeAIOError.installScriptNotFound
-                }
-                return
+            if FileManager.default.fileExists(atPath: installScript.path) {
+                try await Wine.runBatchFile(url: installScript, bottle: bottle)
+            } else if let foundScript = try findInstallScript(in: tempDir) {
+                try await Wine.runBatchFile(url: foundScript, bottle: bottle)
+            } else {
+                throw RuntimeAIOError.installScriptNotFound
             }
-            // Run the install_all.bat file
-            try await Wine.runBatchFile(url: installScript, bottle: bottle)
-            runtimeAIOAlertMessage = "RuntimeAIO installation completed successfully!"
+
+            runtimeAIOAlertMessage = "RuntimeAIO 安装成功！"
             showRuntimeAIOAlert = true
         } catch {
-            runtimeAIOAlertMessage = "RuntimeAIO installation failed: \(error.localizedDescription)"
+            runtimeAIOAlertMessage = "RuntimeAIO 安装失败：\(error.localizedDescription)"
             showRuntimeAIOAlert = true
         }
     }
@@ -247,16 +259,19 @@ struct BottleView: View {
 
 enum RuntimeAIOError: LocalizedError {
     case invalidURL
+    case downloadFailed(Int)
     case extractionFailed
     case installScriptNotFound
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid download URL"
+            return "下载链接无效"
+        case .downloadFailed(let statusCode):
+            return "下载失败（HTTP \(statusCode)），请确认 RuntimeAIO.tar.gz 已上传至 GitHub 仓库主分支"
         case .extractionFailed:
-            return "Failed to extract archive"
+            return "解压失败"
         case .installScriptNotFound:
-            return "install_all.bat not found in archive"
+            return "压缩包中找不到 install_all.bat"
         }
     }
 }
