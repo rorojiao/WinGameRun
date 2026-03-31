@@ -43,7 +43,8 @@ extension Program {
         }
 
         // CrossOver 引擎 + auto 策略 → 启用崩溃自动恢复
-        let useCrashRecovery = bottle.settings.wineEngine == .crossover && dllPolicy == .auto
+        // D3DMetal 引擎 + auto 策略 → 启用崩溃自动恢复
+        let useCrashRecovery = bottle.settings.wineEngine == .d3dmetal && dllPolicy == .auto
 
         Task.detached(priority: .userInitiated) {
             do {

@@ -27,43 +27,17 @@ public class Wine {
     /// Bourbon wineserver 路径（默认）
     private static let wineserverBinary: URL = WineInstaller.binFolder.appending(path: "wineserver")
 
-    /// 根据引擎和游戏兼容性选择返回 Wine 二进制路径
-    /// NW.js/Electron 等 Chromium 游戏与 CrossOver Wine 不兼容，需回退到 Bourbon
+    /// Wine 二进制路径 — 统一使用 Bourbon Wine（D3DMetal 通过 DLL override 控制）
     public static func wineBinaryURL(
         for engine: WineEngine, gameFramework: GameFramework? = nil,
         dllOverridePolicy: DLLOverridePolicy = .auto
     ) -> URL {
-        // 不兼容的游戏框架强制使用 Bourbon Wine
-        let needFallback: Bool
-        switch dllOverridePolicy {
-        case .auto:
-            needFallback = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
-        case .forceBuiltin:
-            needFallback = true
-        case .forceNative:
-            needFallback = false
-        }
-
-        if needFallback {
-            return wineBinary
-        }
-
-        switch engine {
-        case .bourbon:
-            return wineBinary
-        case .crossover:
-            return WineInstaller.crossoverBinFolder()?.appending(path: "wineloader") ?? wineBinary
-        }
+        return wineBinary
     }
 
-    /// 根据引擎选择返回 wineserver 二进制路径
+    /// wineserver 二进制路径 — 统一使用 Bourbon
     private static func wineserverBinaryURL(for engine: WineEngine) -> URL {
-        switch engine {
-        case .bourbon:
-            return wineserverBinary
-        case .crossover:
-            return WineInstaller.crossoverBinFolder()?.appending(path: "wineserver") ?? wineserverBinary
-        }
+        return wineserverBinary
     }
 
     /// Run a process on a executable file given by the `executableURL`
@@ -86,7 +60,7 @@ public class Wine {
     /// Run a `wine` process with the given arguments and environment variables returning a stream of output
     private static func runWineProcess(
         name: String? = nil, args: [String], environment: [String: String] = [:],
-        fileHandle: FileHandle?, engine: WineEngine = .bourbon,
+        fileHandle: FileHandle?, engine: WineEngine = .d3dmetal,
         gameFramework: GameFramework? = nil, dllOverridePolicy: DLLOverridePolicy = .auto
     ) throws -> AsyncStream<ProcessOutput> {
         return try runProcess(
@@ -102,7 +76,7 @@ public class Wine {
     /// Run a `wineserver` process with the given arguments and environment variables returning a stream of output
     private static func runWineserverProcess(
         name: String? = nil, args: [String], environment: [String: String] = [:],
-        fileHandle: FileHandle?, engine: WineEngine = .bourbon
+        fileHandle: FileHandle?, engine: WineEngine = .d3dmetal
     ) throws -> AsyncStream<ProcessOutput> {
         return try runProcess(
             name: name, args: args, environment: environment,
@@ -250,7 +224,7 @@ public class Wine {
         let fileHandle = try makeFileHandle()
         fileHandle.writeApplicationInfo()
         var environment = environment
-        let engine = bottle?.settings.wineEngine ?? .bourbon
+        let engine = bottle?.settings.wineEngine ?? .d3dmetal
 
         if let bottle = bottle {
             fileHandle.writeInfo(for: bottle)

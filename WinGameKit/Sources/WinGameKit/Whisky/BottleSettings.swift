@@ -89,17 +89,31 @@ public enum EnhancedSync: Codable, Equatable {
     case none, esync, msync
 }
 
-/// Wine 引擎选择
+/// 渲染引擎选择（决定 DirectX 翻译路径）
 public enum WineEngine: String, CaseIterable, Codable {
-    case bourbon    // Bourbon Wine 10.18（DX11）
-    case crossover  // CrossOver Wine（DX11 + DX12）
+    case d3dmetal   // D3DMetal: DX→D3DMetal→Metal（2层，最佳性能）
+    case wined3d    // wined3d: DX→wined3d→MoltenVK→Metal（4层，兼容模式）
+    case dxvk       // DXVK: DX11→DXVK→Vulkan→MoltenVK→Metal（4层，成熟稳定）
+
+    // 向后兼容：bourbon → d3dmetal, crossover → d3dmetal
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw {
+        case "bourbon", "crossover":
+            self = .d3dmetal
+        default:
+            self = WineEngine(rawValue: raw) ?? .d3dmetal
+        }
+    }
 
     public func pretty() -> String {
         switch self {
-        case .bourbon:
-            return "Bourbon (DX11)"
-        case .crossover:
-            return "CrossOver (DX11 + DX12)"
+        case .d3dmetal:
+            return "D3DMetal (DX11 + DX12)"
+        case .wined3d:
+            return "wined3d (兼容模式)"
+        case .dxvk:
+            return "DXVK (Vulkan)"
         }
     }
 }
@@ -110,7 +124,7 @@ public struct BottleWineConfig: Codable, Equatable {
     var windowsVersion: WinVersion = .win10
     var enhancedSync: EnhancedSync = .msync
     var avxEnabled: Bool = false
-    var wineEngine: WineEngine = .bourbon
+    var wineEngine: WineEngine = .d3dmetal
 
     public init() {}
 
@@ -121,7 +135,7 @@ public struct BottleWineConfig: Codable, Equatable {
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
         self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
-        self.wineEngine = try container.decodeIfPresent(WineEngine.self, forKey: .wineEngine) ?? .bourbon
+        self.wineEngine = try container.decodeIfPresent(WineEngine.self, forKey: .wineEngine) ?? .d3dmetal
     }
     // swiftlint:enable line_length
 }
@@ -129,16 +143,32 @@ public struct BottleWineConfig: Codable, Equatable {
 public struct BottleMetalConfig: Codable, Equatable {
     var metalHud: Bool = false
     var metalTrace: Bool = false
-    var dxrEnabled: Bool = false
+    var dxrEnabled: Bool = true             // M3+ 默认开启光追
+    var asyncCommit: Bool = true            // D3DM_ENABLE_ASYNC_COMMIT（异步GPU命令提交）
+    var metalFX: Bool = true                // D3DM_ENABLE_METALFX（MetalFX超采样）
+    var multithreaded: Bool = true          // D3DM_MULTITHREADED_INTERFACE_ENABLE（多线程D3D）
+    var gpuSpoofEnabled: Bool = true        // GPU伪装开关
+    var gpuSpoofVendor: String = "0x10de"   // NVIDIA
+    var gpuSpoofDevice: String = "0x2684"   // RTX 4090
+    var gpuSpoofName: String = "NVIDIA GeForce RTX 4090"
 
     public init() {}
 
+    // swiftlint:disable line_length
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.metalHud = try container.decodeIfPresent(Bool.self, forKey: .metalHud) ?? false
         self.metalTrace = try container.decodeIfPresent(Bool.self, forKey: .metalTrace) ?? false
-        self.dxrEnabled = try container.decodeIfPresent(Bool.self, forKey: .dxrEnabled) ?? false
+        self.dxrEnabled = try container.decodeIfPresent(Bool.self, forKey: .dxrEnabled) ?? true
+        self.asyncCommit = try container.decodeIfPresent(Bool.self, forKey: .asyncCommit) ?? true
+        self.metalFX = try container.decodeIfPresent(Bool.self, forKey: .metalFX) ?? true
+        self.multithreaded = try container.decodeIfPresent(Bool.self, forKey: .multithreaded) ?? true
+        self.gpuSpoofEnabled = try container.decodeIfPresent(Bool.self, forKey: .gpuSpoofEnabled) ?? true
+        self.gpuSpoofVendor = try container.decodeIfPresent(String.self, forKey: .gpuSpoofVendor) ?? "0x10de"
+        self.gpuSpoofDevice = try container.decodeIfPresent(String.self, forKey: .gpuSpoofDevice) ?? "0x2684"
+        self.gpuSpoofName = try container.decodeIfPresent(String.self, forKey: .gpuSpoofName) ?? "NVIDIA GeForce RTX 4090"
     }
+    // swiftlint:enable line_length
 }
 
 public enum DXVKHUD: Codable, Equatable {
@@ -247,6 +277,41 @@ public struct BottleSettings: Codable, Equatable {
         set { metalConfig.dxrEnabled = newValue }
     }
 
+    public var asyncCommit: Bool {
+        get { return metalConfig.asyncCommit }
+        set { metalConfig.asyncCommit = newValue }
+    }
+
+    public var metalFX: Bool {
+        get { return metalConfig.metalFX }
+        set { metalConfig.metalFX = newValue }
+    }
+
+    public var multithreaded: Bool {
+        get { return metalConfig.multithreaded }
+        set { metalConfig.multithreaded = newValue }
+    }
+
+    public var gpuSpoofEnabled: Bool {
+        get { return metalConfig.gpuSpoofEnabled }
+        set { metalConfig.gpuSpoofEnabled = newValue }
+    }
+
+    public var gpuSpoofVendor: String {
+        get { return metalConfig.gpuSpoofVendor }
+        set { metalConfig.gpuSpoofVendor = newValue }
+    }
+
+    public var gpuSpoofDevice: String {
+        get { return metalConfig.gpuSpoofDevice }
+        set { metalConfig.gpuSpoofDevice = newValue }
+    }
+
+    public var gpuSpoofName: String {
+        get { return metalConfig.gpuSpoofName }
+        set { metalConfig.gpuSpoofName = newValue }
+    }
+
     public var dxvk: Bool {
         get { return dxvkConfig.dxvk }
         set { dxvkConfig.dxvk = newValue }
@@ -347,44 +412,60 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "ROSETTA_ADVERTISE_AVX")
         }
 
-        if dxrEnabled {
-            wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
+        // MARK: - D3DMetal 性能优化（仅对3D游戏生效）
+        let isChromiumGame = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
+
+        if !isChromiumGame {
+            if dxrEnabled {
+                wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
+            }
+            if asyncCommit {
+                wineEnv.updateValue("1", forKey: "D3DM_ENABLE_ASYNC_COMMIT")
+            }
+            if metalFX {
+                wineEnv.updateValue("1", forKey: "D3DM_ENABLE_METALFX")
+            }
+            if multithreaded {
+                wineEnv.updateValue("1", forKey: "D3DM_MULTITHREADED_INTERFACE_ENABLE")
+            }
+            // GPU 伪装（让游戏启用 NVIDIA 最优渲染路径）
+            if gpuSpoofEnabled {
+                wineEnv.updateValue(gpuSpoofVendor, forKey: "D3DM_VENDOR_ID")
+                wineEnv.updateValue(gpuSpoofDevice, forKey: "D3DM_DEVICE_ID")
+                wineEnv.updateValue(gpuSpoofName, forKey: "D3DM_DEVICE_DESCRIPTION")
+            }
         }
 
-        // CrossOver 引擎：根据游戏类型智能决定 DLL 加载策略
-        if wineEngine == .crossover {
-            let useNativeD3D: Bool
-            switch dllOverridePolicy {
-            case .auto:
-                // NW.js/Electron/RPG Maker 等 Chromium 游戏与 native D3D 不兼容
-                useNativeD3D = !GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
-            case .forceNative:
-                useNativeD3D = true
-            case .forceBuiltin:
-                useNativeD3D = false
-            }
+        // MARK: - DLL Override 策略（按渲染引擎和游戏类型）
+        let useNativeD3DMetal: Bool
+        switch dllOverridePolicy {
+        case .auto:
+            // D3DMetal 引擎 + 非 Chromium 游戏 → 用 native D3DMetal DLL
+            useNativeD3DMetal = (wineEngine == .d3dmetal) && !isChromiumGame
+        case .forceNative:
+            useNativeD3DMetal = true
+        case .forceBuiltin:
+            useNativeD3DMetal = false
+        }
 
-            let d3dOverride: String
-            if useNativeD3D {
-                // 强制 native（D3DMetal）DLL
-                d3dOverride = "d3d11,d3d12,dxgi=n,b"
-            } else {
-                // 强制 builtin（Wine 内置）DLL，覆盖 system32 中可能存在的 D3DMetal DLL
-                d3dOverride = "d3d11,d3d12,dxgi=b"
-            }
+        if useNativeD3DMetal {
+            // D3DMetal 直通：DX→D3DMetal→Metal（2层翻译，最佳性能）
+            let d3dOverride = "d3d11,d3d12,dxgi=n,b"
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
             } else {
                 wineEnv["WINEDLLOVERRIDES"] = d3dOverride
             }
-
-            // CX_ROOT 始终设置（不依赖 DLL override 策略）
-            if let cxBase = WineInstaller.crossoverBasePath() {
-                wineEnv["CX_ROOT"] = cxBase.path(percentEncoded: false)
+        } else if isChromiumGame {
+            // Chromium 游戏：强制 Wine 内置 DLL（避免 D3DMetal 兼容性问题）
+            let d3dOverride = "d3d11,d3d12,dxgi=b"
+            if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
+                wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
+            } else {
+                wineEnv["WINEDLLOVERRIDES"] = d3dOverride
             }
         } else if !D3DMetal.isAvailable() {
-            // Bourbon 引擎 + D3DMetal 未安装时，自动禁用 d3d12.dll，
-            // 强制游戏回退到 DX11，避免 "DX12 is not supported" 错误
+            // D3DMetal 未安装时，自动禁用 d3d12.dll
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";d3d12="
             } else {

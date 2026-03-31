@@ -72,11 +72,30 @@ public class WineInstaller {
     /// 将 CrossOver D3DMetal DLL 安装到指定 Bottle 的 system32
     public static func installCrossoverD3DMetal(to bottleURL: URL) throws {
         guard let d3dFolder = crossoverD3DMetalFolder() else { return }
+        try installD3DMetalStubs(to: bottleURL, from: d3dFolder.appending(path: "wine/x86_64-windows"))
+    }
+
+    /// 将 D3DMetal PE stub DLL 安装到 Bottle 的 system32
+    /// 来源优先级：CrossOver apple_gptk → 无（保持 wined3d）
+    public static func installD3DMetalStubs(to bottleURL: URL) throws {
+        // 优先从 CrossOver 获取 D3DMetal PE stub
+        if let d3dFolder = crossoverD3DMetalFolder() {
+            try installD3DMetalStubs(
+                to: bottleURL,
+                from: d3dFolder.appending(path: "wine/x86_64-windows")
+            )
+            return
+        }
+        // 无可用来源 — 保持 wined3d
+    }
+
+    /// 从指定路径安装 D3DMetal PE stub DLL
+    private static func installD3DMetalStubs(to bottleURL: URL, from srcDir: URL) throws {
         let sys32 = bottleURL.appending(path: "drive_c/windows/system32")
         let fm = FileManager.default
 
         for dll in ["d3d12.dll", "d3d11.dll", "dxgi.dll", "atidxx64.dll"] {
-            let src = d3dFolder.appending(path: "wine/x86_64-windows/\(dll)")
+            let src = srcDir.appending(path: dll)
             let dst = sys32.appending(path: dll)
             guard fm.fileExists(atPath: src.path(percentEncoded: false)) else { continue }
             if fm.fileExists(atPath: dst.path(percentEncoded: false)) {
@@ -84,6 +103,17 @@ public class WineInstaller {
             }
             try fm.copyItem(at: src, to: dst)
         }
+    }
+
+    /// 检查 Bottle 是否已安装 D3DMetal PE stub
+    public static func isD3DMetalStubInstalled(in bottleURL: URL) -> Bool {
+        let sys32 = bottleURL.appending(path: "drive_c/windows/system32")
+        let d3d11 = sys32.appending(path: "d3d11.dll")
+        guard let size = try? FileManager.default.attributesOfItem(
+            atPath: d3d11.path(percentEncoded: false)
+        )[.size] as? Int else { return false }
+        // D3DMetal PE stub < 200KB, wined3d 完整实现 > 3MB
+        return size < 200_000
     }
 
     // MARK: - Bourbon Wine 检测

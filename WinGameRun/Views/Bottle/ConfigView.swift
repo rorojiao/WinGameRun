@@ -89,18 +89,12 @@ struct ConfigView: View {
                         Text(engine.pretty()).tag(engine)
                     }
                 }
-                .disabled(!WineInstaller.isCrossoverInstalled() && bottle.settings.wineEngine == .bourbon)
                 .onChange(of: bottle.settings.wineEngine) { _, newValue in
-                    if newValue == .crossover {
+                    if newValue == .d3dmetal {
                         Task {
-                            try? WineInstaller.installCrossoverD3DMetal(to: bottle.url)
+                            try? WineInstaller.installD3DMetalStubs(to: bottle.url)
                         }
                     }
-                }
-                if bottle.settings.wineEngine == .crossover && !WineInstaller.isCrossoverInstalled() {
-                    Text("config.wineEngine.crossover.missing")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
                 }
                 Picker("config.enhancedSync", selection: $bottle.settings.enhancedSync) {
                     Text("config.enhancedSync.none").tag(EnhancedSync.none)
@@ -193,6 +187,35 @@ struct ConfigView: View {
                             .foregroundStyle(.red)
                     }
                 }
+                Toggle(isOn: $bottle.settings.asyncCommit) {
+                    VStack(alignment: .leading) {
+                        Text("config.asyncCommit")
+                        Text("config.asyncCommit.info")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle(isOn: $bottle.settings.metalFX) {
+                    VStack(alignment: .leading) {
+                        Text("config.metalFX")
+                        Text("config.metalFX.info")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle(isOn: $bottle.settings.multithreaded) {
+                    Text("config.multithreaded")
+                }
+                Toggle(isOn: $bottle.settings.gpuSpoofEnabled) {
+                    VStack(alignment: .leading) {
+                        Text("config.gpuSpoof")
+                        if bottle.settings.gpuSpoofEnabled {
+                            Text(bottle.settings.gpuSpoofName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
                 Toggle(isOn: $bottle.settings.metalHud) {
                     Text("config.metalHud")
                 }
@@ -201,7 +224,6 @@ struct ConfigView: View {
                     Text("config.metalTrace.info")
                 }
                 if let device = MTLCreateSystemDefaultDevice() {
-                    // Represents the Apple family 9 GPU features that correspond to the Apple A17, M3, and M4 GPUs.
                     if device.supportsFamily(.apple9) {
                         Toggle(isOn: $bottle.settings.dxrEnabled) {
                             Text("config.dxr")
