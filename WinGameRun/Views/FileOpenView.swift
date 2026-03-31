@@ -83,10 +83,11 @@ struct FileOpenView: View {
                         try await Wine.runBatchFile(url: fileURL,
                                                     bottle: bottle)
                     } else {
-                        // 自动检测游戏框架，传入 DLL override 策略
+                        // 自动检测游戏框架，添加性能优化参数
                         let framework = GameTypeDetector.detect(programURL: fileURL)
+                        let perfArgs = GameTypeDetector.performanceArgs(for: framework)
                         try await Wine.runProgram(
-                            at: fileURL, bottle: bottle,
+                            at: fileURL, args: perfArgs, bottle: bottle,
                             gameFramework: framework
                         )
                     }

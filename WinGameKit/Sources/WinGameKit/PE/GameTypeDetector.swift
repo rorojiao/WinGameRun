@@ -102,6 +102,18 @@ public enum GameTypeDetector {
         }
     }
 
+    /// 返回针对该框架的性能优化启动参数
+    /// NW.js/Electron 在 Wine 下 GPU 渲染管线（ANGLE→D3D→Wine→Metal）非常慢，
+    /// --disable-gpu 跳过 ANGLE 直接用软件渲染，CPU 降低约 50%
+    public static func performanceArgs(for framework: GameFramework) -> [String] {
+        switch framework {
+        case .nwjs, .electron, .rpgMaker:
+            return ["--disable-gpu"]
+        case .native, .unknown:
+            return []
+        }
+    }
+
     // MARK: - 内部检测方法
 
     /// RPG Maker MV/MZ 检测：基于 NW.js + 特有目录结构
