@@ -466,11 +466,28 @@ extension Wine {
             )
         }
 
+        // 安装 Tahoma CJK 替代：将 STHeitiSCLight 复制为 tahoma.ttf
+        // winecfg 的 DPI 预览用 CreateFont("Tahoma") 直接渲染，不走字体替换表
+        // 只有在字体目录里存在真正的 tahoma.ttf 文件才能修复方块问题
+        if let srcHeiti = installed.first(where: { $0.fileName == "STHeitiSCLight.ttc" }) {
+            let srcURL = winFontsDir.appending(path: srcHeiti.fileName)
+            let tahomaURL = winFontsDir.appending(path: "tahoma.ttf")
+            if fm.fileExists(atPath: tahomaURL.path(percentEncoded: false)) {
+                try fm.removeItem(at: tahomaURL)
+            }
+            try fm.copyItem(at: srcURL, to: tahomaURL)
+            try await addRegistryKey(
+                bottle: bottle, key: fontsKey,
+                name: "Tahoma (TrueType)",
+                data: "tahoma.ttf", type: .string
+            )
+        }
+
         // 字体替换：只在 STHeitiSCLight 成功安装时才写入 FontSubstitutes
         // 目标必须是已安装的字体，否则替换无效
         guard let primaryFont = installed.first(where: { $0.fileName == "STHeitiSCLight.ttc" }) else { return }
         let substKey = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion\FontSubstitutes"#
-        for fallback in ["Tahoma", "MS Shell Dlg", "MS Shell Dlg 2", "MS UI Gothic"] {
+        for fallback in ["MS Shell Dlg", "MS Shell Dlg 2", "MS UI Gothic"] {
             try await addRegistryKey(
                 bottle: bottle, key: substKey,
                 name: fallback, data: primaryFont.displayName, type: .string
