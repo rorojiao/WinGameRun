@@ -410,6 +410,7 @@
 				6E50D98129CD0EAF008C39F6 /* SwiftLint */,
 				6E95F66C2AB3EF2F00D585D1 /* Embed WinGameCmd */,
 				6EFDF65A2AAE2DA800EF622F /* Embed Foundation Extensions */,
+				CC40495029CCA19C006E3F1C /* Codesign Ad-hoc */,
 			);
 			buildRules = (
 			);
@@ -563,6 +564,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		CC40495029CCA19C006E3F1C /* Codesign Ad-hoc */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Codesign Ad-hoc";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "codesign --force --deep --sign - \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\n";
+		};
 		6E50D98129CD0EAF008C39F6 /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;

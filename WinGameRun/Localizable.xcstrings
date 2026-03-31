@@ -3854,6 +3854,72 @@
         }
       }
     },
+    "config.d3dmetal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D3DMetal (GPTK)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D3DMetal (GPTK)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D3DMetal (GPTK)"
+          }
+        }
+      }
+    },
+    "config.d3dmetal.installed %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed (v%@) — DX12 enabled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装 (v%@) — DX12 可用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安裝 (v%@) — DX12 可用"
+          }
+        }
+      }
+    },
+    "config.d3dmetal.missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not installed — DX12 auto-disabled, games will use DX11"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装 — DX12 已自动禁用，游戏将使用 DX11"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安裝 — DX12 已自動停用，遊戲將使用 DX11"
+          }
+        }
+      }
+    },
     "config.dxr" : {
       "extractionState" : "manual",
       "localizations" : {

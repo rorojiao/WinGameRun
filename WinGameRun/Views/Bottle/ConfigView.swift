@@ -151,6 +151,30 @@ struct ConfigView: View {
                 .disabled(!bottle.settings.dxvk)
             }
             Section("config.title.metal", isExpanded: $metalSectionExpanded) {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("config.d3dmetal")
+                        if D3DMetal.isAvailable() {
+                            if let version = D3DMetal.detectedVersion() {
+                                Text("config.d3dmetal.installed \(version)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Text("config.d3dmetal.missing")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    Spacer()
+                    if D3DMetal.isAvailable() {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                }
                 Toggle(isOn: $bottle.settings.metalHud) {
                     Text("config.metalHud")
                 }
@@ -165,6 +189,7 @@ struct ConfigView: View {
                             Text("config.dxr")
                             Text("config.dxr.info")
                         }
+                        .disabled(!D3DMetal.isAvailable())
                     }
                 }
             }

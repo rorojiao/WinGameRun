@@ -325,5 +325,15 @@ public struct BottleSettings: Codable, Equatable {
         if dxrEnabled {
             wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
         }
+
+        // 当 D3DMetal (GPTK) 未安装时，自动禁用 d3d12.dll，
+        // 强制游戏回退到 DX11，避免 "DX12 is not supported" 错误
+        if !D3DMetal.isAvailable() {
+            if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
+                wineEnv["WINEDLLOVERRIDES"] = existing + ";d3d12="
+            } else {
+                wineEnv["WINEDLLOVERRIDES"] = "d3d12="
+            }
+        }
     }
 }
