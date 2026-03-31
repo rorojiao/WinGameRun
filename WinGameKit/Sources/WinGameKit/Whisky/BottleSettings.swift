@@ -348,13 +348,17 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
         }
 
-        // CrossOver 引擎：强制使用 native D3DMetal DLL（支持 DX12）
+        // CrossOver 引擎：强制使用 native D3DMetal DLL（支持 DX12）+ 设置 CX_ROOT
         if wineEngine == .crossover {
             let d3dOverride = "d3d11,d3d12,dxgi=n,b"
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
             } else {
                 wineEnv["WINEDLLOVERRIDES"] = d3dOverride
+            }
+            // 设置 CX_ROOT 避免 cxcompatdb 报错
+            if let cxBase = WineInstaller.crossoverBasePath() {
+                wineEnv["CX_ROOT"] = cxBase.path(percentEncoded: false)
             }
         } else if !D3DMetal.isAvailable() {
             // Bourbon 引擎 + D3DMetal 未安装时，自动禁用 d3d12.dll，
