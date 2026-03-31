@@ -32,12 +32,31 @@ extension Program {
     func runInWine() {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
+        let gameFramework = settings.detectedFramework
+            ?? GameTypeDetector.detect(programURL: url)
+        let dllPolicy = settings.dllOverridePolicy
+
+        // CrossOver 引擎 + auto 策略 → 启用崩溃自动恢复
+        let useCrashRecovery = bottle.settings.wineEngine == .crossover && dllPolicy == .auto
 
         Task.detached(priority: .userInitiated) {
             do {
-                try await Wine.runProgram(
-                    at: self.url, args: arguments, bottle: self.bottle, environment: environment
-                )
+                if useCrashRecovery {
+                    if let workingPolicy = try await CrashRecoveryManager.runWithRecovery(
+                        program: self
+                    ) {
+                        // 降级成功，保存可工作的配置
+                        await MainActor.run {
+                            self.settings.dllOverridePolicy = workingPolicy
+                        }
+                    }
+                } else {
+                    try await Wine.runProgram(
+                        at: self.url, args: arguments, bottle: self.bottle,
+                        environment: environment,
+                        dllOverridePolicy: dllPolicy, gameFramework: gameFramework
+                    )
+                }
             } catch {
                 await MainActor.run {
                     self.showRunError(message: error.localizedDescription)

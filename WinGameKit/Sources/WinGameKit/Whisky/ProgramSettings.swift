@@ -70,6 +70,25 @@ public struct ProgramSettings: Codable {
     public var locale: Locales = .auto
     public var environment: [String: String] = [:]
     public var arguments: String = ""
+    /// 自动检测到的游戏框架类型
+    public var detectedFramework: GameFramework?
+    /// DLL Override 策略（auto = 根据检测结果自动决定）
+    public var dllOverridePolicy: DLLOverridePolicy = .auto
+
+    enum CodingKeys: String, CodingKey {
+        case locale, environment, arguments, detectedFramework, dllOverridePolicy
+    }
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        locale = try container.decodeIfPresent(Locales.self, forKey: .locale) ?? .auto
+        environment = try container.decodeIfPresent([String: String].self, forKey: .environment) ?? [:]
+        arguments = try container.decodeIfPresent(String.self, forKey: .arguments) ?? ""
+        detectedFramework = try container.decodeIfPresent(GameFramework.self, forKey: .detectedFramework)
+        dllOverridePolicy = try container.decodeIfPresent(DLLOverridePolicy.self, forKey: .dllOverridePolicy) ?? .auto
+    }
 
     static func decode(from settingsURL: URL) throws -> ProgramSettings {
         guard FileManager.default.fileExists(atPath: settingsURL.path(percentEncoded: false)) else {

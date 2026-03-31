@@ -78,6 +78,14 @@ public final class Program: ObservableObject, Equatable, Hashable, Identifiable,
         } catch {
             self.peFile = nil
         }
+
+        // 自动检测游戏框架类型（首次添加时检测，结果持久化到 plist）
+        if self.settings.detectedFramework == nil {
+            let detected = GameTypeDetector.detect(programURL: url)
+            if detected != .unknown {
+                self.settings.detectedFramework = detected
+            }
+        }
     }
 
     public func generateEnvironment() -> [String: String] {

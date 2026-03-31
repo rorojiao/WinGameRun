@@ -24,6 +24,7 @@ struct ProgramView: View {
     @ObservedObject var program: Program
     @State var cachedIconImage: Image?
     @AppStorage("configSectionExpanded") private var configSectionExpanded: Bool = true
+    @AppStorage("compatibilitySectionExpanded") private var compatibilitySectionExpanded: Bool = true
     @AppStorage("envArgsSectionExpanded") private var envArgsSectionExpanded: Bool = true
 
     var body: some View {
@@ -43,6 +44,31 @@ struct ProgramView: View {
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                         .labelsHidden()
+                }
+            }
+            Section("program.compatibility", isExpanded: $compatibilitySectionExpanded) {
+                // 检测到的游戏框架
+                HStack {
+                    Text("program.framework")
+                    Spacer()
+                    if let framework = program.settings.detectedFramework {
+                        Text(framework.displayName)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("program.framework.undetected")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                // DLL Override 策略
+                Picker("program.dllPolicy", selection: $program.settings.dllOverridePolicy) {
+                    ForEach(DLLOverridePolicy.allCases, id: \.self) { policy in
+                        Text(policy.pretty()).tag(policy)
+                    }
+                }
+                // 重新检测按钮
+                Button("program.redetect") {
+                    let detected = GameTypeDetector.detect(programURL: program.url)
+                    program.settings.detectedFramework = detected
                 }
             }
             EnvironmentArgView(program: program, isExpanded: $envArgsSectionExpanded)

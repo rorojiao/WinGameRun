@@ -27,8 +27,27 @@ public class Wine {
     /// Bourbon wineserver 路径（默认）
     private static let wineserverBinary: URL = WineInstaller.binFolder.appending(path: "wineserver")
 
-    /// 根据引擎选择返回 Wine 二进制路径
-    public static func wineBinaryURL(for engine: WineEngine) -> URL {
+    /// 根据引擎和游戏兼容性选择返回 Wine 二进制路径
+    /// NW.js/Electron 等 Chromium 游戏与 CrossOver Wine 不兼容，需回退到 Bourbon
+    public static func wineBinaryURL(
+        for engine: WineEngine, gameFramework: GameFramework? = nil,
+        dllOverridePolicy: DLLOverridePolicy = .auto
+    ) -> URL {
+        // 不兼容的游戏框架强制使用 Bourbon Wine
+        let needFallback: Bool
+        switch dllOverridePolicy {
+        case .auto:
+            needFallback = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
+        case .forceBuiltin:
+            needFallback = true
+        case .forceNative:
+            needFallback = false
+        }
+
+        if needFallback {
+            return wineBinary
+        }
+
         switch engine {
         case .bourbon:
             return wineBinary
@@ -67,11 +86,15 @@ public class Wine {
     /// Run a `wine` process with the given arguments and environment variables returning a stream of output
     private static func runWineProcess(
         name: String? = nil, args: [String], environment: [String: String] = [:],
-        fileHandle: FileHandle?, engine: WineEngine = .bourbon
+        fileHandle: FileHandle?, engine: WineEngine = .bourbon,
+        gameFramework: GameFramework? = nil, dllOverridePolicy: DLLOverridePolicy = .auto
     ) throws -> AsyncStream<ProcessOutput> {
         return try runProcess(
             name: name, args: args, environment: environment,
-            executableURL: wineBinaryURL(for: engine),
+            executableURL: wineBinaryURL(
+                for: engine, gameFramework: gameFramework,
+                dllOverridePolicy: dllOverridePolicy
+            ),
             fileHandle: fileHandle
         )
     }
@@ -90,7 +113,8 @@ public class Wine {
 
     /// Run a `wine` process with the given arguments and environment variables returning a stream of output
     public static func runWineProcess(
-        name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:]
+        name: String? = nil, args: [String], bottle: Bottle, environment: [String: String] = [:],
+        dllOverridePolicy: DLLOverridePolicy = .auto, gameFramework: GameFramework? = nil
     ) throws -> AsyncStream<ProcessOutput> {
         let fileHandle = try makeFileHandle()
         fileHandle.writeApplicationInfo()
@@ -98,9 +122,14 @@ public class Wine {
 
         return try runWineProcess(
             name: name, args: args,
-            environment: constructWineEnvironment(for: bottle, environment: environment),
+            environment: constructWineEnvironment(
+                for: bottle, environment: environment,
+                dllOverridePolicy: dllOverridePolicy, gameFramework: gameFramework
+            ),
             fileHandle: fileHandle,
-            engine: bottle.settings.wineEngine
+            engine: bottle.settings.wineEngine,
+            gameFramework: gameFramework,
+            dllOverridePolicy: dllOverridePolicy
         )
     }
 
@@ -120,19 +149,41 @@ public class Wine {
         )
     }
 
+    /// 游戏运行结果（用于崩溃检测）
+    public struct ProgramRunResult {
+        public let startTime: Date
+        public let endTime: Date
+        public let terminationStatus: Int32
+    }
+
     /// Execute a `wine start /unix {url}` command returning the output result
+    @discardableResult
     public static func runProgram(
-        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
-    ) async throws {
+        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
+        dllOverridePolicy: DLLOverridePolicy = .auto, gameFramework: GameFramework? = nil
+    ) async throws -> ProgramRunResult {
         if bottle.settings.dxvk {
             try enableDXVK(bottle: bottle)
         }
 
-        for await _ in try Self.runWineProcess(
+        let startTime = Date()
+        var terminationStatus: Int32 = 0
+
+        for await output in try Self.runWineProcess(
             name: url.lastPathComponent,
             args: ["start", "/unix", url.path(percentEncoded: false)] + args,
-            bottle: bottle, environment: environment
-        ) { }
+            bottle: bottle, environment: environment,
+            dllOverridePolicy: dllOverridePolicy, gameFramework: gameFramework
+        ) {
+            if case .terminated(let process) = output {
+                terminationStatus = process.terminationStatus
+            }
+        }
+
+        return ProgramRunResult(
+            startTime: startTime, endTime: Date(),
+            terminationStatus: terminationStatus
+        )
     }
 
     public static func generateRunCommand(
@@ -267,13 +318,18 @@ public class Wine {
 
     /// Construct an environment merging the bottle values with the given values
     private static func constructWineEnvironment(
-        for bottle: Bottle, environment: [String: String] = [:]
+        for bottle: Bottle, environment: [String: String] = [:],
+        dllOverridePolicy: DLLOverridePolicy = .auto, gameFramework: GameFramework? = nil
     ) -> [String: String] {
         var result = inheritedEnvironment
         result["WINEPREFIX"] = bottle.url.path
         result["WINEDEBUG"] = "fixme-all"
         result["GST_DEBUG"] = "1"
-        bottle.settings.environmentVariables(wineEnv: &result)
+        bottle.settings.environmentVariables(
+            wineEnv: &result,
+            dllOverridePolicy: dllOverridePolicy,
+            gameFramework: gameFramework
+        )
         guard !environment.isEmpty else { return result }
         result.merge(environment, uniquingKeysWith: { $1 })
         return result

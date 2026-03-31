@@ -300,7 +300,11 @@ public struct BottleSettings: Codable, Equatable {
     }
 
     // swiftlint:disable:next cyclomatic_complexity
-    public func environmentVariables(wineEnv: inout [String: String]) {
+    public func environmentVariables(
+        wineEnv: inout [String: String],
+        dllOverridePolicy: DLLOverridePolicy = .auto,
+        gameFramework: GameFramework? = nil
+    ) {
         if dxvk {
             wineEnv.updateValue("dxgi,d3d9,d3d10core,d3d11=n,b", forKey: "WINEDLLOVERRIDES")
             switch dxvkHud {
@@ -313,10 +317,9 @@ public struct BottleSettings: Codable, Equatable {
             case .off:
                 break
             }
-        }
-
-        if dxvkAsync {
-            wineEnv.updateValue("1", forKey: "DXVK_ASYNC")
+            if dxvkAsync {
+                wineEnv.updateValue("1", forKey: "DXVK_ASYNC")
+            }
         }
 
         switch enhancedSync {
@@ -348,15 +351,34 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
         }
 
-        // CrossOver 引擎：强制使用 native D3DMetal DLL（支持 DX12）+ 设置 CX_ROOT
+        // CrossOver 引擎：根据游戏类型智能决定 DLL 加载策略
         if wineEngine == .crossover {
-            let d3dOverride = "d3d11,d3d12,dxgi=n,b"
+            let useNativeD3D: Bool
+            switch dllOverridePolicy {
+            case .auto:
+                // NW.js/Electron/RPG Maker 等 Chromium 游戏与 native D3D 不兼容
+                useNativeD3D = !GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
+            case .forceNative:
+                useNativeD3D = true
+            case .forceBuiltin:
+                useNativeD3D = false
+            }
+
+            let d3dOverride: String
+            if useNativeD3D {
+                // 强制 native（D3DMetal）DLL
+                d3dOverride = "d3d11,d3d12,dxgi=n,b"
+            } else {
+                // 强制 builtin（Wine 内置）DLL，覆盖 system32 中可能存在的 D3DMetal DLL
+                d3dOverride = "d3d11,d3d12,dxgi=b"
+            }
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
             } else {
                 wineEnv["WINEDLLOVERRIDES"] = d3dOverride
             }
-            // 设置 CX_ROOT 避免 cxcompatdb 报错
+
+            // CX_ROOT 始终设置（不依赖 DLL override 策略）
             if let cxBase = WineInstaller.crossoverBasePath() {
                 wineEnv["CX_ROOT"] = cxBase.path(percentEncoded: false)
             }
