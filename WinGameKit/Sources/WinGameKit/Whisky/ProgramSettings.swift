@@ -74,9 +74,11 @@ public struct ProgramSettings: Codable {
     public var detectedFramework: GameFramework?
     /// DLL Override 策略（auto = 根据检测结果自动决定）
     public var dllOverridePolicy: DLLOverridePolicy = .auto
+    /// 禁用GPU渲染（auto=根据游戏类型自动，true=强制禁用，false=强制启用）
+    public var disableGPU: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case locale, environment, arguments, detectedFramework, dllOverridePolicy
+        case locale, environment, arguments, detectedFramework, dllOverridePolicy, disableGPU
     }
 
     public init() {}
@@ -88,6 +90,7 @@ public struct ProgramSettings: Codable {
         arguments = try container.decodeIfPresent(String.self, forKey: .arguments) ?? ""
         detectedFramework = try container.decodeIfPresent(GameFramework.self, forKey: .detectedFramework)
         dllOverridePolicy = try container.decodeIfPresent(DLLOverridePolicy.self, forKey: .dllOverridePolicy) ?? .auto
+        disableGPU = try container.decodeIfPresent(Bool.self, forKey: .disableGPU)
     }
 
     static func decode(from settingsURL: URL) throws -> ProgramSettings {

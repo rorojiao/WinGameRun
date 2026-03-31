@@ -65,6 +65,30 @@ struct ProgramView: View {
                         Text(policy.pretty()).tag(policy)
                     }
                 }
+                // 禁用GPU渲染（NW.js自动开启，用户可覆盖）
+                HStack {
+                    Text("program.disableGPU")
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: {
+                            if let v = program.settings.disableGPU { return v ? 1 : 0 }
+                            return 2 // auto
+                        },
+                        set: {
+                            switch $0 {
+                            case 0: program.settings.disableGPU = false
+                            case 1: program.settings.disableGPU = true
+                            default: program.settings.disableGPU = nil
+                            }
+                        }
+                    )) {
+                        Text("program.disableGPU.auto").tag(2)
+                        Text("program.disableGPU.on").tag(1)
+                        Text("program.disableGPU.off").tag(0)
+                    }
+                    .labelsHidden()
+                    .frame(width: 100)
+                }
                 // 重新检测按钮
                 Button("program.redetect") {
                     let detected = GameTypeDetector.detect(programURL: program.url)

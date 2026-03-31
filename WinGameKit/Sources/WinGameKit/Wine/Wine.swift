@@ -282,10 +282,16 @@ public class Wine {
     /// Process.environment 完全替换环境，不设置这些会导致 Wine/游戏闪退
     private static var inheritedEnvironment: [String: String] {
         var env: [String: String] = [:]
+        // 基础系统变量（缺少会导致闪退）
         for key in ["HOME", "USER", "PATH", "TMPDIR", "LANG"] {
             if let val = ProcessInfo.processInfo.environment[key] {
                 env[key] = val
             }
+        }
+        // X11/显示相关（部分游戏需要）
+        env["DISPLAY"] = ProcessInfo.processInfo.environment["DISPLAY"] ?? ":0"
+        if let xdg = ProcessInfo.processInfo.environment["XDG_RUNTIME_DIR"] {
+            env["XDG_RUNTIME_DIR"] = xdg
         }
         return env
     }

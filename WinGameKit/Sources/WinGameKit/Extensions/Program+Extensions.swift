@@ -36,10 +36,16 @@ extension Program {
             ?? GameTypeDetector.detect(programURL: url)
         let dllPolicy = settings.dllOverridePolicy
 
-        // 自动添加性能优化参数（NW.js: --disable-gpu 降低50% CPU）
-        let perfArgs = GameTypeDetector.performanceArgs(for: gameFramework)
-        for arg in perfArgs where !arguments.contains(arg) {
-            arguments.append(arg)
+        // --disable-gpu 控制：用户设置 > 自动检测
+        let shouldDisableGPU: Bool
+        if let userSetting = settings.disableGPU {
+            shouldDisableGPU = userSetting
+        } else {
+            // 自动：NW.js/Electron/RPG Maker 禁用GPU（CPU降50%）
+            shouldDisableGPU = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework)
+        }
+        if shouldDisableGPU && !arguments.contains("--disable-gpu") {
+            arguments.append("--disable-gpu")
         }
 
         // CrossOver 引擎 + auto 策略 → 启用崩溃自动恢复
