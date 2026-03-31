@@ -253,15 +253,26 @@ public class Wine {
         )
     }
 
+    /// 从当前进程继承的必要环境变量
+    /// Process.environment 完全替换环境，不设置这些会导致 Wine/游戏闪退
+    private static var inheritedEnvironment: [String: String] {
+        var env: [String: String] = [:]
+        for key in ["HOME", "USER", "PATH", "TMPDIR", "LANG"] {
+            if let val = ProcessInfo.processInfo.environment[key] {
+                env[key] = val
+            }
+        }
+        return env
+    }
+
     /// Construct an environment merging the bottle values with the given values
     private static func constructWineEnvironment(
         for bottle: Bottle, environment: [String: String] = [:]
     ) -> [String: String] {
-        var result: [String: String] = [
-            "WINEPREFIX": bottle.url.path,
-            "WINEDEBUG": "fixme-all",
-            "GST_DEBUG": "1"
-        ]
+        var result = inheritedEnvironment
+        result["WINEPREFIX"] = bottle.url.path
+        result["WINEDEBUG"] = "fixme-all"
+        result["GST_DEBUG"] = "1"
         bottle.settings.environmentVariables(wineEnv: &result)
         guard !environment.isEmpty else { return result }
         result.merge(environment, uniquingKeysWith: { $1 })
@@ -272,11 +283,10 @@ public class Wine {
     private static func constructWineServerEnvironment(
         for bottle: Bottle, environment: [String: String] = [:]
     ) -> [String: String] {
-        var result: [String: String] = [
-            "WINEPREFIX": bottle.url.path,
-            "WINEDEBUG": "fixme-all",
-            "GST_DEBUG": "1"
-        ]
+        var result = inheritedEnvironment
+        result["WINEPREFIX"] = bottle.url.path
+        result["WINEDEBUG"] = "fixme-all"
+        result["GST_DEBUG"] = "1"
         guard !environment.isEmpty else { return result }
         result.merge(environment, uniquingKeysWith: { $1 })
         return result
