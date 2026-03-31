@@ -84,6 +84,24 @@ struct ConfigView: View {
                             }
                         })
                 }
+                Picker("config.wineEngine", selection: $bottle.settings.wineEngine) {
+                    ForEach(WineEngine.allCases, id: \.self) { engine in
+                        Text(engine.pretty()).tag(engine)
+                    }
+                }
+                .disabled(!WineInstaller.isCrossoverInstalled() && bottle.settings.wineEngine == .bourbon)
+                .onChange(of: bottle.settings.wineEngine) { _, newValue in
+                    if newValue == .crossover {
+                        Task {
+                            try? WineInstaller.installCrossoverD3DMetal(to: bottle.url)
+                        }
+                    }
+                }
+                if bottle.settings.wineEngine == .crossover && !WineInstaller.isCrossoverInstalled() {
+                    Text("config.wineEngine.crossover.missing")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 Picker("config.enhancedSync", selection: $bottle.settings.enhancedSync) {
                     Text("config.enhancedSync.none").tag(EnhancedSync.none)
                     Text("config.enhancedSync.esync").tag(EnhancedSync.esync)

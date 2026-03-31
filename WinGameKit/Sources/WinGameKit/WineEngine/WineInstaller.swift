@@ -31,6 +31,63 @@ public class WineInstaller {
     /// URL to the installed `wine` `bin` directory
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
+    // MARK: - CrossOver Wine 检测
+
+    /// CrossOver.app 可能的安装路径
+    private static let crossoverSearchPaths = [
+        "/Applications/CrossOver.app",
+        NSHomeDirectory() + "/Applications/CrossOver.app"
+    ]
+
+    /// 检测 CrossOver 是否已安装，返回 .app 路径
+    public static func crossoverAppPath() -> String? {
+        for path in crossoverSearchPaths where FileManager.default.fileExists(atPath: path) {
+            return path
+        }
+        return nil
+    }
+
+    /// CrossOver 是否已安装
+    public static func isCrossoverInstalled() -> Bool {
+        return crossoverAppPath() != nil
+    }
+
+    /// CrossOver 内部资源根路径
+    public static func crossoverBasePath() -> URL? {
+        guard let appPath = crossoverAppPath() else { return nil }
+        return URL(fileURLWithPath: appPath)
+            .appending(path: "Contents/SharedSupport/CrossOver")
+    }
+
+    /// CrossOver Wine 二进制文件夹（含 wineloader、wineserver）
+    public static func crossoverBinFolder() -> URL? {
+        return crossoverBasePath()?.appending(path: "CrossOver-Hosted Application")
+    }
+
+    /// CrossOver D3DMetal 组件路径（apple_gptk）
+    public static func crossoverD3DMetalFolder() -> URL? {
+        return crossoverBasePath()?.appending(path: "lib64/apple_gptk")
+    }
+
+    /// 将 CrossOver D3DMetal DLL 安装到指定 Bottle 的 system32
+    public static func installCrossoverD3DMetal(to bottleURL: URL) throws {
+        guard let d3dFolder = crossoverD3DMetalFolder() else { return }
+        let sys32 = bottleURL.appending(path: "drive_c/windows/system32")
+        let fm = FileManager.default
+
+        for dll in ["d3d12.dll", "d3d11.dll", "dxgi.dll", "atidxx64.dll"] {
+            let src = d3dFolder.appending(path: "wine/x86_64-windows/\(dll)")
+            let dst = sys32.appending(path: dll)
+            guard fm.fileExists(atPath: src.path(percentEncoded: false)) else { continue }
+            if fm.fileExists(atPath: dst.path(percentEncoded: false)) {
+                try fm.removeItem(at: dst)
+            }
+            try fm.copyItem(at: src, to: dst)
+        }
+    }
+
+    // MARK: - Bourbon Wine 检测
+
     public static func isWineInstalled() -> Bool {
         // 优先检查版本 plist，fallback 检查 wine 二进制是否存在
         if wineVersion() != nil { return true }

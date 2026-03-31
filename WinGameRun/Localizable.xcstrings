@@ -3854,6 +3854,50 @@
         }
       }
     },
+    "config.wineEngine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine Engine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 引擎"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 引擎"
+          }
+        }
+      }
+    },
+    "config.wineEngine.crossover.missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CrossOver not installed — download from codeweavers.com"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CrossOver 未安装 — 请从 codeweavers.com 下载"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CrossOver 未安裝 — 請從 codeweavers.com 下載"
+          }
+        }
+      }
+    },
     "config.d3dmetal" : {
       "localizations" : {
         "en" : {

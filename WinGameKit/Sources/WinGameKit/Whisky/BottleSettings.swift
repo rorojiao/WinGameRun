@@ -89,12 +89,28 @@ public enum EnhancedSync: Codable, Equatable {
     case none, esync, msync
 }
 
+/// Wine 引擎选择
+public enum WineEngine: String, CaseIterable, Codable {
+    case bourbon    // Bourbon Wine 10.18（DX11）
+    case crossover  // CrossOver Wine（DX11 + DX12）
+
+    public func pretty() -> String {
+        switch self {
+        case .bourbon:
+            return "Bourbon (DX11)"
+        case .crossover:
+            return "CrossOver (DX11 + DX12)"
+        }
+    }
+}
+
 public struct BottleWineConfig: Codable, Equatable {
     static let defaultWineVersion = SemanticVersion(7, 7, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
     var windowsVersion: WinVersion = .win10
     var enhancedSync: EnhancedSync = .msync
     var avxEnabled: Bool = false
+    var wineEngine: WineEngine = .bourbon
 
     public init() {}
 
@@ -105,6 +121,7 @@ public struct BottleWineConfig: Codable, Equatable {
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
         self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
+        self.wineEngine = try container.decodeIfPresent(WineEngine.self, forKey: .wineEngine) ?? .bourbon
     }
     // swiftlint:enable line_length
 }
@@ -208,6 +225,11 @@ public struct BottleSettings: Codable, Equatable {
     public var enhancedSync: EnhancedSync {
         get { return wineConfig.enhancedSync }
         set { wineConfig.enhancedSync = newValue }
+    }
+
+    public var wineEngine: WineEngine {
+        get { return wineConfig.wineEngine }
+        set { wineConfig.wineEngine = newValue }
     }
 
     public var metalHud: Bool {
@@ -326,9 +348,17 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
         }
 
-        // 当 D3DMetal (GPTK) 未安装时，自动禁用 d3d12.dll，
-        // 强制游戏回退到 DX11，避免 "DX12 is not supported" 错误
-        if !D3DMetal.isAvailable() {
+        // CrossOver 引擎：强制使用 native D3DMetal DLL（支持 DX12）
+        if wineEngine == .crossover {
+            let d3dOverride = "d3d11,d3d12,dxgi=n,b"
+            if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
+                wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
+            } else {
+                wineEnv["WINEDLLOVERRIDES"] = d3dOverride
+            }
+        } else if !D3DMetal.isAvailable() {
+            // Bourbon 引擎 + D3DMetal 未安装时，自动禁用 d3d12.dll，
+            // 强制游戏回退到 DX11，避免 "DX12 is not supported" 错误
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";d3d12="
             } else {

@@ -22,10 +22,30 @@ import os.log
 public class Wine {
     /// URL to the installed `DXVK` folder
     private static let dxvkFolder: URL = WineInstaller.libraryFolder.appending(path: "DXVK")
-    /// Path to the `wine` binary
+    /// Bourbon Wine 二进制路径（默认）
     public static let wineBinary: URL = WineInstaller.binFolder.appending(path: "wine")
-    /// Path to the `wineserver` binary
+    /// Bourbon wineserver 路径（默认）
     private static let wineserverBinary: URL = WineInstaller.binFolder.appending(path: "wineserver")
+
+    /// 根据引擎选择返回 Wine 二进制路径
+    public static func wineBinaryURL(for engine: WineEngine) -> URL {
+        switch engine {
+        case .bourbon:
+            return wineBinary
+        case .crossover:
+            return WineInstaller.crossoverBinFolder()?.appending(path: "wineloader") ?? wineBinary
+        }
+    }
+
+    /// 根据引擎选择返回 wineserver 二进制路径
+    private static func wineserverBinaryURL(for engine: WineEngine) -> URL {
+        switch engine {
+        case .bourbon:
+            return wineserverBinary
+        case .crossover:
+            return WineInstaller.crossoverBinFolder()?.appending(path: "wineserver") ?? wineserverBinary
+        }
+    }
 
     /// Run a process on a executable file given by the `executableURL`
     private static func runProcess(
@@ -47,10 +67,11 @@ public class Wine {
     /// Run a `wine` process with the given arguments and environment variables returning a stream of output
     private static func runWineProcess(
         name: String? = nil, args: [String], environment: [String: String] = [:],
-        fileHandle: FileHandle?
+        fileHandle: FileHandle?, engine: WineEngine = .bourbon
     ) throws -> AsyncStream<ProcessOutput> {
         return try runProcess(
-            name: name, args: args, environment: environment, executableURL: wineBinary,
+            name: name, args: args, environment: environment,
+            executableURL: wineBinaryURL(for: engine),
             fileHandle: fileHandle
         )
     }
@@ -58,10 +79,11 @@ public class Wine {
     /// Run a `wineserver` process with the given arguments and environment variables returning a stream of output
     private static func runWineserverProcess(
         name: String? = nil, args: [String], environment: [String: String] = [:],
-        fileHandle: FileHandle?
+        fileHandle: FileHandle?, engine: WineEngine = .bourbon
     ) throws -> AsyncStream<ProcessOutput> {
         return try runProcess(
-            name: name, args: args, environment: environment, executableURL: wineserverBinary,
+            name: name, args: args, environment: environment,
+            executableURL: wineserverBinaryURL(for: engine),
             fileHandle: fileHandle
         )
     }
@@ -77,7 +99,8 @@ public class Wine {
         return try runWineProcess(
             name: name, args: args,
             environment: constructWineEnvironment(for: bottle, environment: environment),
-            fileHandle: fileHandle
+            fileHandle: fileHandle,
+            engine: bottle.settings.wineEngine
         )
     }
 
@@ -92,7 +115,8 @@ public class Wine {
         return try runWineserverProcess(
             name: name, args: args,
             environment: constructWineServerEnvironment(for: bottle, environment: environment),
-            fileHandle: fileHandle
+            fileHandle: fileHandle,
+            engine: bottle.settings.wineEngine
         )
     }
 
@@ -114,7 +138,8 @@ public class Wine {
     public static func generateRunCommand(
         at url: URL, bottle: Bottle, args: String, environment: [String: String]
     ) -> String {
-        var wineCmd = "\(wineBinary.esc) start /unix \(url.esc) \(args)"
+        let binary = wineBinaryURL(for: bottle.settings.wineEngine)
+        var wineCmd = "\(binary.esc) start /unix \(url.esc) \(args)"
         let env = constructWineEnvironment(for: bottle, environment: environment)
         for environment in env {
             wineCmd = "\(environment.key)=\"\(environment.value)\" " + wineCmd
@@ -174,13 +199,16 @@ public class Wine {
         let fileHandle = try makeFileHandle()
         fileHandle.writeApplicationInfo()
         var environment = environment
+        let engine = bottle?.settings.wineEngine ?? .bourbon
 
         if let bottle = bottle {
             fileHandle.writeInfo(for: bottle)
             environment = constructWineEnvironment(for: bottle, environment: environment)
         }
 
-        for await output in try runWineProcess(args: args, environment: environment, fileHandle: fileHandle) {
+        for await output in try runWineProcess(
+            args: args, environment: environment, fileHandle: fileHandle, engine: engine
+        ) {
             switch output {
             case .started, .terminated:
                 break
