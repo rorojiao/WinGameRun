@@ -74,6 +74,10 @@ public extension Process {
             }
 
             terminationHandler = { (process: Process) in
+                // 停止 readabilityHandler，避免子进程继承 fd 后持续空转占 CPU
+                pipe.fileHandleForReading.readabilityHandler = nil
+                errorPipe.fileHandleForReading.readabilityHandler = nil
+
                 do {
                     _ = try pipe.fileHandleForReading.readToEnd()
                     _ = try errorPipe.fileHandleForReading.readToEnd()
