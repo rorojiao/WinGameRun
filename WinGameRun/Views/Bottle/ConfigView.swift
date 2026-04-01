@@ -90,6 +90,8 @@ struct ConfigView: View {
                     }
                 }
                 .onChange(of: bottle.settings.wineEngine) { _, newValue in
+                    // 同步 dxvk Bool，保证两条路径（Picker + Bool）行为一致
+                    bottle.settings.dxvk = (newValue == .dxvk)
                     if newValue == .d3dmetal {
                         Task {
                             try? WineInstaller.installD3DMetalStubs(to: bottle.url)
@@ -149,6 +151,10 @@ struct ConfigView: View {
             Section("config.title.dxvk", isExpanded: $dxvkSectionExpanded) {
                 Toggle(isOn: $bottle.settings.dxvk) {
                     Text("config.dxvk")
+                }
+                .onChange(of: bottle.settings.dxvk) { _, enabled in
+                    // 双向同步：DXVK Bool ↔ WineEngine Picker
+                    bottle.settings.wineEngine = enabled ? .dxvk : .dxmt
                 }
                 Toggle(isOn: $bottle.settings.dxvkAsync) {
                     Text("config.dxvk.async")
