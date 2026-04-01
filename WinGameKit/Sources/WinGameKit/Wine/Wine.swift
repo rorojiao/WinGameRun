@@ -155,12 +155,21 @@ public class Wine {
             }
         }
 
-        // 游戏退出后等待该 Bottle 的 Wine 系统进程自然退出，超时 30 秒后强制清理
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { try? await Self.runWineserver(["-w"], bottle: bottle) }
-            group.addTask { try? await Task.sleep(for: .seconds(30)) }
-            await group.next()
+        // 游戏退出后等待该 Bottle 的 Wine 系统进程自然退出，超时 30 秒后强制杀死
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                try? await Self.runWineserver(["-w"], bottle: bottle)
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(30))
+                return false
+            }
+            let naturalExit = await group.next() ?? false
             group.cancelAll()
+            if !naturalExit {
+                try? await Self.runWineserver(["-k"], bottle: bottle)
+            }
         }
 
         return ProgramRunResult(
@@ -173,7 +182,8 @@ public class Wine {
         at url: URL, bottle: Bottle, args: String, environment: [String: String]
     ) -> String {
         let binary = wineBinaryURL(for: bottle.settings.wineEngine)
-        var wineCmd = "\(binary.esc) start /wait /unix \(url.esc) \(args)"
+        let escapedArgs = args.isEmpty ? "" : " " + shellEscape(args)
+        var wineCmd = "\(binary.esc) start /wait /unix \(url.esc)\(escapedArgs)"
         let env = constructWineEnvironment(for: bottle, environment: environment)
         for environment in env {
             let escaped = Self.shellEscape(environment.value)

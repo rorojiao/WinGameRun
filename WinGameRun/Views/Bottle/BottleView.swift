@@ -195,7 +195,9 @@ struct BottleView: View {
             }
             let dlConfig = URLSessionConfiguration.default
             dlConfig.connectionProxyDictionary = [:]
-            let (tempURL, response) = try await URLSession(configuration: dlConfig).download(from: url)
+            let dlSession = URLSession(configuration: dlConfig)
+            defer { dlSession.finishTasksAndInvalidate() }
+            let (tempURL, response) = try await dlSession.download(from: url)
 
             // 修复：先检查 HTTP 状态码，避免把 404 HTML 页面当 tar.gz 解压
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {

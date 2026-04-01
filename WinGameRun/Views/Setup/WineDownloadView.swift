@@ -118,6 +118,7 @@ struct WineDownloadView: View {
     }
 
     func formatRemainingTime(remainingBytes: Int64) -> String {
+        guard downloadSpeed > 0 else { return "" }
         let remainingTimeInSeconds = Double(remainingBytes) / downloadSpeed
 
         let formatter = DateComponentsFormatter()
