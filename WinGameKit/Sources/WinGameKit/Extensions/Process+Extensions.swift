@@ -78,13 +78,19 @@ public extension Process {
                 pipe.fileHandleForReading.readabilityHandler = nil
                 errorPipe.fileHandleForReading.readabilityHandler = nil
 
-                do {
-                    _ = try pipe.fileHandleForReading.readToEnd()
-                    _ = try errorPipe.fileHandleForReading.readToEnd()
-                    try fileHandle?.close()
-                } catch {
-                    Logger.wineKit.error("Error while clearing data: \(error)")
+                // 确保日志文件句柄一定被关闭
+                defer { try? fileHandle?.close() }
+
+                // 读取残留数据并关闭 Pipe fd，防止 fd 泄漏
+                do { _ = try pipe.fileHandleForReading.readToEnd() } catch {
+                    Logger.wineKit.error("读取 stdout 残留失败: \(error)")
                 }
+                do { _ = try errorPipe.fileHandleForReading.readToEnd() } catch {
+                    Logger.wineKit.error("读取 stderr 残留失败: \(error)")
+                }
+                // 关闭 reading 端 fd（writing 端由子进程继承，系统已在进程退出时关闭）
+                try? pipe.fileHandleForReading.close()
+                try? errorPipe.fileHandleForReading.close()
 
                 process.logTermination(name: name)
                 continuation.yield(.terminated(process))

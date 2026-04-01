@@ -46,7 +46,12 @@ public final class SteamIntegration: Sendable {
         if !FileManager.default.fileExists(atPath: installerDest.path(percentEncoded: false)) {
             let config = URLSessionConfiguration.default
             config.connectionProxyDictionary = [:]
-            let (tempURL, _) = try await URLSession(configuration: config).download(from: Self.steamInstallerURL)
+            let session = URLSession(configuration: config)
+            defer { session.finishTasksAndInvalidate() }
+            let (tempURL, response) = try await session.download(from: Self.steamInstallerURL)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw URLError(.badServerResponse)
+            }
             try FileManager.default.moveItem(at: tempURL, to: installerDest)
         }
 

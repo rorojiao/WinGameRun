@@ -85,7 +85,10 @@ extension Program {
     }
 
     public func runInTerminal() {
-        let wineCmd = generateTerminalCommand().replacingOccurrences(of: "\\", with: "\\\\")
+        // 转义 AppleScript 字符串中的特殊字符：反斜杠和双引号
+        let wineCmd = generateTerminalCommand()
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
 
         let script = """
         tell application "Terminal"

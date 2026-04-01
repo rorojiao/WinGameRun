@@ -121,11 +121,7 @@ struct WinGameRunApp: App {
 
     static func killBottles() {
         for bottle in BottleVM.shared.bottles {
-            do {
-                try Wine.killBottle(bottle: bottle)
-            } catch {
-                print("Failed to kill bottle: \(error)")
-            }
+            Wine.killBottle(bottle: bottle)
         }
     }
 

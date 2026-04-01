@@ -155,8 +155,13 @@ public class Wine {
             }
         }
 
-        // 游戏退出后自动清理该 Bottle 的 Wine 系统进程（services.exe、explorer.exe 等）
-        try? await runWineserver(["-k"], bottle: bottle)
+        // 游戏退出后等待该 Bottle 的 Wine 系统进程自然退出，超时 30 秒后强制清理
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { try? await Self.runWineserver(["-w"], bottle: bottle) }
+            group.addTask { try? await Task.sleep(for: .seconds(30)) }
+            await group.next()
+            group.cancelAll()
+        }
 
         return ProgramRunResult(
             startTime: startTime, endTime: Date(),
@@ -171,10 +176,16 @@ public class Wine {
         var wineCmd = "\(binary.esc) start /wait /unix \(url.esc) \(args)"
         let env = constructWineEnvironment(for: bottle, environment: environment)
         for environment in env {
-            wineCmd = "\(environment.key)=\"\(environment.value)\" " + wineCmd
+            let escaped = Self.shellEscape(environment.value)
+            wineCmd = "\(environment.key)=\(escaped) " + wineCmd
         }
 
         return wineCmd
+    }
+
+    /// 对 shell 字符串使用单引号包裹，防止特殊字符注入
+    private static func shellEscape(_ value: String) -> String {
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
@@ -193,9 +204,10 @@ public class Wine {
         alias winepath=\"wine winepath\"
         """
 
-        let env = constructWineEnvironment(for: bottle, environment: constructWineEnvironment(for: bottle))
+        let env = constructWineEnvironment(for: bottle)
         for environment in env {
-            cmd += "\nexport \(environment.key)=\"\(environment.value)\""
+            let escaped = Self.shellEscape(environment.value)
+            cmd += "\nexport \(environment.key)=\(escaped)"
         }
 
         return cmd
@@ -265,9 +277,13 @@ public class Wine {
         return try await runWine(["cmd", "/c", url.path(percentEncoded: false)], bottle: bottle)
     }
 
-    public static func killBottle(bottle: Bottle) throws {
+    public static func killBottle(bottle: Bottle) {
         Task.detached(priority: .userInitiated) {
-            try await runWineserver(["-k"], bottle: bottle)
+            do {
+                try await runWineserver(["-k"], bottle: bottle)
+            } catch {
+                Logger.wineKit.error("终止 Bottle 失败: \(error)")
+            }
         }
     }
 
@@ -347,7 +363,7 @@ public class Wine {
 }
 
 enum WineInterfaceError: Error {
-    case invalidResponce
+    case invalidResponse
 }
 
 enum RegistryType: String {
@@ -421,7 +437,7 @@ extension Wine {
             }
         }
 
-        throw WineInterfaceError.invalidResponce
+        throw WineInterfaceError.invalidResponse
     }
 
     public static func buildVersion(bottle: Bottle) async throws -> String? {

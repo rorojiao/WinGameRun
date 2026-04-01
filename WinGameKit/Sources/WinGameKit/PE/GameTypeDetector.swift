@@ -82,8 +82,11 @@ public enum GameTypeDetector {
             return .nwjs
         }
 
-        // Electron 特征
+        // Electron 特征（部分 RPG Maker 新版使用 Electron 而非 NW.js）
         if isElectron(directory: dir) {
+            if isRPGMaker(directory: dir) {
+                return .rpgMaker
+            }
             return .electron
         }
 

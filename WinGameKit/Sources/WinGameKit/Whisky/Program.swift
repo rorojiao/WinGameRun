@@ -38,10 +38,12 @@ public final class Program: ObservableObject, Equatable, Hashable, Identifiable,
     @Published public var pinned: Bool {
         didSet {
             if pinned {
-                bottle.settings.pins.append(PinnedProgram(
-                    name: name.replacingOccurrences(of: ".exe", with: ""),
-                    url: url
-                ))
+                if !bottle.settings.pins.contains(where: { $0.url == url }) {
+                    bottle.settings.pins.append(PinnedProgram(
+                        name: name.replacingOccurrences(of: ".exe", with: ""),
+                        url: url
+                    ))
+                }
             } else {
                 bottle.settings.pins.removeAll(where: { $0.url == url })
             }
@@ -80,10 +82,12 @@ public final class Program: ObservableObject, Equatable, Hashable, Identifiable,
         }
 
         // 自动检测游戏框架类型（首次添加时检测，结果持久化到 plist）
+        // 注意：Swift init 中对属性赋值不触发 didSet，需手动保存
         if self.settings.detectedFramework == nil {
             let detected = GameTypeDetector.detect(programURL: url)
             if detected != .unknown {
                 self.settings.detectedFramework = detected
+                try? self.settings.encode(to: settingsUrl)
             }
         }
     }

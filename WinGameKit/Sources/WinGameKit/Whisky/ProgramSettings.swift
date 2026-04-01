@@ -17,11 +17,12 @@
 //
 
 import Foundation
+import os.log
 
 public enum Locales: String, Codable, CaseIterable {
     case auto = ""
     case german = "de_DE.UTF-8"
-    case english = "en_US"
+    case english = "en_US.UTF-8"
     case spanish = "es_ES.UTF-8"
     case french = "fr_FR.UTF-8"
     case italian = "it_IT.UTF-8"
@@ -85,7 +86,12 @@ public struct ProgramSettings: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        locale = try container.decodeIfPresent(Locales.self, forKey: .locale) ?? .auto
+        // 向后兼容：旧版 plist 中 english 的 rawValue 为 "en_US"（缺少 .UTF-8 后缀）
+        if let rawLocale = try container.decodeIfPresent(String.self, forKey: .locale) {
+            locale = Locales(rawValue: rawLocale) ?? (rawLocale == "en_US" ? .english : .auto)
+        } else {
+            locale = .auto
+        }
         environment = try container.decodeIfPresent([String: String].self, forKey: .environment) ?? [:]
         arguments = try container.decodeIfPresent(String.self, forKey: .arguments) ?? ""
         detectedFramework = try container.decodeIfPresent(GameFramework.self, forKey: .detectedFramework)
@@ -100,8 +106,16 @@ public struct ProgramSettings: Codable {
             return settings
         }
 
-        let data = try Data(contentsOf: settingsURL)
-        return try PropertyListDecoder().decode(ProgramSettings.self, from: data)
+        do {
+            let data = try Data(contentsOf: settingsURL)
+            return try PropertyListDecoder().decode(ProgramSettings.self, from: data)
+        } catch {
+            // plist 损坏时重置为默认值，避免每次加载都抛出异常
+            Logger.wineKit.warning("程序设置文件损坏，重置为默认值: \(error)")
+            let settings = ProgramSettings()
+            try settings.encode(to: settingsURL)
+            return settings
+        }
     }
 
     func encode(to settingsURL: URL) throws {

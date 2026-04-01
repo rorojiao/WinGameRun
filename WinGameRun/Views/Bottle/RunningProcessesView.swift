@@ -103,7 +103,7 @@ struct RunningProcessesView: View {
         if let thisProcess = processes.first(where: { $0.id == selectedProcess }) {
             do {
                 try await Wine.runWine(["taskkill.exe", "/PID", thisProcess.pid, "/F"], bottle: bottle)
-                try await Task.sleep(nanoseconds: 2000)
+                try await Task.sleep(for: .seconds(2))
             } catch {
                 print("Error running taskkill.exe: \(error)")
             }

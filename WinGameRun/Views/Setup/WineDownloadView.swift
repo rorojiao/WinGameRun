@@ -87,12 +87,14 @@ struct WineDownloadView: View {
                             await MainActor.run {
                                 let currentTime = Date()
                                 let elapsedTime = currentTime.timeIntervalSince(startTime ?? currentTime)
-                                if completedBytes > 0 {
+                                if completedBytes > 0 && elapsedTime > 0.1 {
                                     downloadSpeed = Double(completedBytes) / elapsedTime
                                 }
                                 totalBytes = task.countOfBytesExpectedToReceive
                                 completedBytes = task.countOfBytesReceived
-                                fractionProgress = Double(completedBytes) / Double(totalBytes)
+                                if totalBytes > 0 {
+                                    fractionProgress = Double(completedBytes) / Double(totalBytes)
+                                }
                             }
                         }
                     }

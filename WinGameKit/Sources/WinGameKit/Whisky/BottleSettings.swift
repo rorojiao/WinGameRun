@@ -330,8 +330,8 @@ public struct BottleSettings: Codable, Equatable {
     @discardableResult
     public static func decode(from metadataURL: URL) throws -> BottleSettings {
         guard FileManager.default.fileExists(atPath: metadataURL.path(percentEncoded: false)) else {
-            let decoder = PropertyListDecoder()
-            let settings = try decoder.decode(BottleSettings.self, from: Data(contentsOf: metadataURL))
+            // 文件不存在 → 创建默认配置并写入磁盘
+            let settings = BottleSettings()
             try settings.encode(to: metadataURL)
             return settings
         }
@@ -370,6 +370,7 @@ public struct BottleSettings: Codable, Equatable {
         dllOverridePolicy: DLLOverridePolicy = .auto,
         gameFramework: GameFramework? = nil
     ) {
+        // DXVK 和 D3DMetal 是互斥的渲染方案，DXVK 优先
         if dxvk {
             wineEnv.updateValue("dxgi,d3d9,d3d10core,d3d11=n,b", forKey: "WINEDLLOVERRIDES")
             switch dxvkHud {
@@ -385,6 +386,7 @@ public struct BottleSettings: Codable, Equatable {
             if dxvkAsync {
                 wineEnv.updateValue("1", forKey: "DXVK_ASYNC")
             }
+            // DXVK 模式下跳过后续 D3DMetal DLL override，避免冲突
         }
 
         switch enhancedSync {
@@ -412,10 +414,10 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "ROSETTA_ADVERTISE_AVX")
         }
 
-        // MARK: - D3DMetal 性能优化（仅对3D游戏生效）
+        // MARK: - D3DMetal 性能优化（仅 D3DMetal 引擎 + 非 Chromium 游戏时生效）
         let isChromiumGame = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework ?? .unknown)
 
-        if !isChromiumGame {
+        if wineEngine == .d3dmetal && !isChromiumGame && !dxvk {
             if dxrEnabled {
                 wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
             }
@@ -437,6 +439,9 @@ public struct BottleSettings: Codable, Equatable {
         }
 
         // MARK: - DLL Override 策略（按渲染引擎和游戏类型）
+        // DXVK 已经设置了自己的 WINEDLLOVERRIDES，跳过 D3DMetal 路径
+        guard !dxvk else { return }
+
         let useNativeD3DMetal: Bool
         switch dllOverridePolicy {
         case .auto:
@@ -450,14 +455,21 @@ public struct BottleSettings: Codable, Equatable {
 
         if useNativeD3DMetal {
             // D3DMetal 直通：DX→D3DMetal→Metal（2层翻译，最佳性能）
-            let d3dOverride = "d3d11,d3d12,dxgi=n,b"
+            // 系统级 GPTK 未安装时，D3D12 无法工作（libd3dshared.dylib 内部需要系统路径），
+            // 仅启用 D3D11/DXGI 的 native override，d3d12 设为禁用避免崩溃
+            let d3dOverride: String
+            if D3DMetal.isSystemGPTKInstalled() {
+                d3dOverride = "d3d11,d3d12,dxgi=n,b"
+            } else {
+                d3dOverride = "d3d11,dxgi=n,b;d3d12="
+            }
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride
             } else {
                 wineEnv["WINEDLLOVERRIDES"] = d3dOverride
             }
-        } else if isChromiumGame {
-            // Chromium 游戏：强制 Wine 内置 DLL（避免 D3DMetal 兼容性问题）
+        } else if isChromiumGame || dllOverridePolicy == .forceBuiltin {
+            // Chromium 游戏或用户/崩溃恢复强制 builtin：使用 Wine 内置 DLL
             let d3dOverride = "d3d11,d3d12,dxgi=b"
             if let existing = wineEnv["WINEDLLOVERRIDES"], !existing.isEmpty {
                 wineEnv["WINEDLLOVERRIDES"] = existing + ";" + d3dOverride

@@ -50,9 +50,23 @@ public enum D3DMetal {
         return paths
     }
 
-    /// 检测 D3DMetal 是否可用
+    /// 检测 D3DMetal 是否可用（包括 App 内置）
     public static func isAvailable() -> Bool {
         return installedPath() != nil
+    }
+
+    /// 检测系统级 GPTK 是否安装（D3D12 需要系统级 GPTK，
+    /// App 内置的 D3DMetal.framework 仅支持 D3D11/DXMT，
+    /// 因为 libd3dshared.dylib 内部需要系统路径存在才能初始化 D3D12）
+    public static func isSystemGPTKInstalled() -> Bool {
+        let fm = FileManager.default
+        let systemPaths = [
+            "/Library/Apple/usr/lib/d3d/",
+            "/usr/local/lib/d3d/",
+            "/usr/local/opt/game-porting-toolkit/",
+            "/System/Library/Frameworks/D3DMetal.framework"
+        ]
+        return systemPaths.contains { fm.fileExists(atPath: $0) }
     }
 
     /// 返回找到的安装路径，未安装返回 nil
@@ -103,7 +117,12 @@ public enum D3DMetal {
         // 下载 DMG
         let config = URLSessionConfiguration.ephemeral
         config.connectionProxyDictionary = [:]
-        let (dmgURL, _) = try await URLSession(configuration: config).download(from: gptkDMGURL)
+        let session = URLSession(configuration: config)
+        defer { session.finishTasksAndInvalidate() }
+        let (dmgURL, response) = try await session.download(from: gptkDMGURL)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
 
         let localDMG = fm.temporaryDirectory.appending(path: "gptk.dmg")
         if fm.fileExists(atPath: localDMG.path(percentEncoded: false)) {
@@ -119,6 +138,9 @@ public enum D3DMetal {
                           "-nobrowse", "-mountpoint", mountPoint.path(percentEncoded: false)]
         try mount.run()
         mount.waitUntilExit()
+        guard mount.terminationStatus == 0 else {
+            throw URLError(.cannotOpenFile)
+        }
 
         defer {
             // 卸载 DMG

@@ -18,6 +18,7 @@
 
 import Foundation
 import SemanticVersion
+import os.log
 
 public class WineInstaller {
     /// The WinGameRun application folder
@@ -175,38 +176,24 @@ public class WineInstaller {
         let versionPlistURL = "https://raw.githubusercontent.com/leonewt0n/Bourbon/refs/heads/main/WhiskyWineVersion.plist"
         let localVersion = wineVersion()
 
-        var remoteVersion: SemanticVersion?
-
-        if let remoteUrl = URL(string: versionPlistURL) {
-            remoteVersion = await withCheckedContinuation { continuation in
-                let config = URLSessionConfiguration.ephemeral
-                config.connectionProxyDictionary = [:]
-                URLSession(configuration: config).dataTask(with: URLRequest(url: remoteUrl)) { data, _, error in
-                    do {
-                        if error == nil, let data = data {
-                            let decoder = PropertyListDecoder()
-                            let remoteInfo = try decoder.decode(WineVersion.self, from: data)
-                            let remoteVersion = remoteInfo.version
-
-                            continuation.resume(returning: remoteVersion)
-                            return
-                        }
-                        if let error = error {
-                            print(error)
-                        }
-                    } catch {
-                        print(error)
-                    }
-
-                    continuation.resume(returning: nil)
-                }.resume()
-            }
+        guard let remoteUrl = URL(string: versionPlistURL) else {
+            return (false, SemanticVersion(0, 0, 0))
         }
 
-        if let localVersion = localVersion, let remoteVersion = remoteVersion {
-            if localVersion < remoteVersion {
-                return (true, remoteVersion)
+        do {
+            let config = URLSessionConfiguration.ephemeral
+            config.connectionProxyDictionary = [:]
+            let session = URLSession(configuration: config)
+            defer { session.finishTasksAndInvalidate() }
+
+            let (data, _) = try await session.data(from: remoteUrl)
+            let remoteInfo = try PropertyListDecoder().decode(WineVersion.self, from: data)
+
+            if let localVersion = localVersion, localVersion < remoteInfo.version {
+                return (true, remoteInfo.version)
             }
+        } catch {
+            Logger.wineKit.error("检查 Wine 更新失败: \(error)")
         }
 
         return (false, SemanticVersion(0, 0, 0))
