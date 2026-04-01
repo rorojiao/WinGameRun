@@ -49,13 +49,17 @@ public enum CrashRecoveryManager {
 
     /// 带崩溃恢复的游戏运行
     /// 仅在 CrossOver 引擎 + auto 策略时触发自动恢复
+    /// - Parameters:
+    ///   - args: 已处理好的启动参数（含 --disable-gpu 等性能参数）
+    ///   - framework: 已检测好的游戏框架类型（含 NW.js/Electron 等）
     /// - Returns: 成功运行的策略（如果发生了降级），nil 表示首次就成功或无需恢复
-    public static func runWithRecovery(program: Program) async throws -> DLLOverridePolicy? {
+    public static func runWithRecovery(
+        program: Program, args: [String], framework: GameFramework
+    ) async throws -> DLLOverridePolicy? {
         let bottle = program.bottle
-        let arguments = program.settings.arguments
-            .split { $0.isWhitespace }.map(String.init)
+        let arguments = args
         let environment = program.generateEnvironment()
-        let gameFramework = program.settings.detectedFramework
+        let gameFramework = framework
 
         let fallbacks = fallbackSequence()
 

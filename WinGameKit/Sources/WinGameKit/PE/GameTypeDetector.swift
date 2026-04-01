@@ -39,7 +39,7 @@ public enum GameFramework: String, Codable, Equatable {
 }
 
 /// DLL Override 策略（每个程序可单独设置）
-public enum DLLOverridePolicy: String, Codable, CaseIterable, Equatable {
+public enum DLLOverridePolicy: String, Codable, CaseIterable, Equatable, Sendable {
     case auto          // 根据 GameTypeDetector 自动决定
     case forceNative   // 强制使用 native D3D（CrossOver D3DMetal 模式）
     case forceBuiltin  // 强制使用 Wine 内置 d3d（兼容模式）
@@ -103,8 +103,8 @@ public enum GameTypeDetector {
     }
 
     /// 返回针对该框架的性能优化启动参数
-    /// NW.js/Electron 在 Wine 下 GPU 渲染管线（ANGLE→D3D→Wine→Metal）非常慢，
-    /// --disable-gpu 跳过 ANGLE 直接用软件渲染，CPU 降低约 50%
+    /// NW.js/Electron 在 Wine 下 GPU 渲染吃 270%+ CPU（ANGLE→D3D→wined3d→Vulkan→Metal 多层翻译），
+    /// --disable-gpu 使用软件渲染（CPU ~130%），输入延迟取决于游戏本身（Steamworks 等），不受渲染模式影响
     public static func performanceArgs(for framework: GameFramework) -> [String] {
         switch framework {
         case .nwjs, .electron, .rpgMaker:

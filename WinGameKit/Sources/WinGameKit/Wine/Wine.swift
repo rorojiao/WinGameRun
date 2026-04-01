@@ -130,7 +130,8 @@ public class Wine {
         public let terminationStatus: Int32
     }
 
-    /// Execute a `wine start /unix {url}` command returning the output result
+    /// Execute a `wine start /wait /unix {url}` command returning the output result
+    /// /wait 确保等待游戏进程真正退出，退出后自动清理该 Bottle 的 wineserver
     @discardableResult
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
@@ -145,7 +146,7 @@ public class Wine {
 
         for await output in try Self.runWineProcess(
             name: url.lastPathComponent,
-            args: ["start", "/unix", url.path(percentEncoded: false)] + args,
+            args: ["start", "/wait", "/unix", url.path(percentEncoded: false)] + args,
             bottle: bottle, environment: environment,
             dllOverridePolicy: dllOverridePolicy, gameFramework: gameFramework
         ) {
@@ -153,6 +154,9 @@ public class Wine {
                 terminationStatus = process.terminationStatus
             }
         }
+
+        // 游戏退出后自动清理该 Bottle 的 Wine 系统进程（services.exe、explorer.exe 等）
+        try? await runWineserver(["-k"], bottle: bottle)
 
         return ProgramRunResult(
             startTime: startTime, endTime: Date(),
@@ -164,7 +168,7 @@ public class Wine {
         at url: URL, bottle: Bottle, args: String, environment: [String: String]
     ) -> String {
         let binary = wineBinaryURL(for: bottle.settings.wineEngine)
-        var wineCmd = "\(binary.esc) start /unix \(url.esc) \(args)"
+        var wineCmd = "\(binary.esc) start /wait /unix \(url.esc) \(args)"
         let env = constructWineEnvironment(for: bottle, environment: environment)
         for environment in env {
             wineCmd = "\(environment.key)=\"\(environment.value)\" " + wineCmd
@@ -305,6 +309,19 @@ public class Wine {
         result["WINEPREFIX"] = bottle.url.path
         result["WINEDEBUG"] = "fixme-all"
         result["GST_DEBUG"] = "1"
+
+        // D3DMetal 自举加载：DYLD_FRAMEWORK_PATH 指向 Wine 内置 D3DMetal.framework 目录。
+        // D3DMetal.framework 依赖 /System/Library/Frameworks/D3DMetal.framework（GPTK 系统安装路径），
+        // 但该路径在未安装 GPTK 时不存在。通过 DYLD_FRAMEWORK_PATH 让 dyld 优先在此目录搜索
+        // D3DMetal.framework，自举时发现框架已加载直接复用，与 CrossOver 的做法完全一致。
+        let externalDir = WineInstaller.libraryFolder
+            .appending(path: "Wine/lib/external")
+            .path(percentEncoded: false)
+        let existingFrameworkPath = result["DYLD_FRAMEWORK_PATH"] ?? ""
+        result["DYLD_FRAMEWORK_PATH"] = existingFrameworkPath.isEmpty
+            ? externalDir
+            : externalDir + ":" + existingFrameworkPath
+
         bottle.settings.environmentVariables(
             wineEnv: &result,
             dllOverridePolicy: dllOverridePolicy,

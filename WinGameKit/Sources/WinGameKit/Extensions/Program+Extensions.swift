@@ -36,16 +36,16 @@ extension Program {
             ?? GameTypeDetector.detect(programURL: url)
         let dllPolicy = settings.dllOverridePolicy
 
-        // --disable-gpu 控制：用户设置 > 自动检测
-        let shouldDisableGPU: Bool
-        if let userSetting = settings.disableGPU {
-            shouldDisableGPU = userSetting
+        // NW.js/Electron 性能参数：用户设置 > 自动检测
+        if let userSetting = settings.disableGPU, userSetting == false {
+            // 用户手动选择启用 GPU — 不添加 --disable-gpu
         } else {
-            // 自动：NW.js/Electron/RPG Maker 禁用GPU（CPU降50%）
-            shouldDisableGPU = GameTypeDetector.isIncompatibleWithNativeD3D(gameFramework)
-        }
-        if shouldDisableGPU && !arguments.contains("--disable-gpu") {
-            arguments.append("--disable-gpu")
+            // 自动或用户选择禁用：添加框架优化参数
+            for arg in GameTypeDetector.performanceArgs(for: gameFramework) {
+                if !arguments.contains(arg) {
+                    arguments.append(arg)
+                }
+            }
         }
 
         // CrossOver 引擎 + auto 策略 → 启用崩溃自动恢复
@@ -56,7 +56,7 @@ extension Program {
             do {
                 if useCrashRecovery {
                     if let workingPolicy = try await CrashRecoveryManager.runWithRecovery(
-                        program: self
+                        program: self, args: arguments, framework: gameFramework
                     ) {
                         // 降级成功，保存可工作的配置
                         await MainActor.run {
