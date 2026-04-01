@@ -106,15 +106,11 @@ public enum GameTypeDetector {
     }
 
     /// 返回针对该框架的性能优化启动参数
-    /// NW.js/Electron 在 Wine 下 GPU 渲染吃 270%+ CPU（ANGLE→D3D→wined3d→Vulkan→Metal 多层翻译），
-    /// --disable-gpu 使用软件渲染（CPU ~130%），输入延迟取决于游戏本身（Steamworks 等），不受渲染模式影响
+    /// NW.js/Electron 游戏使用 builtin wined3d（ANGLE→wined3d→Vulkan→MoltenVK→Metal），
+    /// GPU 渲染帧率更高，不再需要 --disable-gpu 软件渲染
     public static func performanceArgs(for framework: GameFramework) -> [String] {
-        switch framework {
-        case .nwjs, .electron, .rpgMaker:
-            return ["--disable-gpu"]
-        case .native, .unknown:
-            return []
-        }
+        // 所有框架类型都使用 GPU 渲染，不再强制 --disable-gpu
+        return []
     }
 
     // MARK: - 内部检测方法
