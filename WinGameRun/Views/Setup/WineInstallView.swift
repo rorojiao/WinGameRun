@@ -64,7 +64,7 @@ struct WineInstallView: View {
 
     @MainActor
     func proceed() {
-        // Wine 安装完成后，进入 GPTK 引导
-        path.append(.gptkGuide)
+        // Wine + DXMT + D3DMetal 已一并安装，直接完成 Setup
+        showSetup = false
     }
 }

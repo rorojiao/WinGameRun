@@ -155,22 +155,10 @@ public class Wine {
             }
         }
 
-        // 游戏退出后等待该 Bottle 的 Wine 系统进程自然退出，超时 30 秒后强制杀死
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                try? await Self.runWineserver(["-w"], bottle: bottle)
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(30))
-                return false
-            }
-            let naturalExit = await group.next() ?? false
-            group.cancelAll()
-            if !naturalExit {
-                try? await Self.runWineserver(["-k"], bottle: bottle)
-            }
-        }
+        // 游戏退出后，wineserver -w 会因 winedevice.exe/services.exe 等系统服务永久阻塞。
+        // 改为：等待 2 秒让游戏自身 cleanup 完成，然后直接 wineserver -k 终止整个 prefix。
+        try? await Task.sleep(for: .seconds(2))
+        try? await Self.runWineserver(["-k"], bottle: bottle)
 
         return ProgramRunResult(
             startTime: startTime, endTime: Date(),
