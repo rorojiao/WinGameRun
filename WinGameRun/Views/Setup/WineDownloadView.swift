@@ -65,10 +65,9 @@ struct WineDownloadView: View {
         .frame(width: 400, height: 200)
         .onAppear {
             Task {
+                // Wine 11.5 + DXMT v0.74 + MoltenVK 预编译包
                 // swiftlint:disable:next line_length
-                // MVP 阶段：使用 Bourbon 的预编译 Wine tarball（~444MB）
-                // 后续将替换为 WinGameRun 自己的 GitHub Release
-                if let url: URL = URL(string: "https://media.githubusercontent.com/media/leonewt0n/Bourbon/refs/heads/main/Libraries.tar.gz") {
+                if let url: URL = URL(string: "https://github.com/rorojiao/WinGameRun/releases/download/wine-v11.5/Wine-11.5-DXMT.tar.gz") {
                     // 绕过系统代理，避免代理导致下载失败
                     let config = URLSessionConfiguration.ephemeral
                     config.connectionProxyDictionary = [:]

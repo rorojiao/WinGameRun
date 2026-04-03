@@ -106,10 +106,12 @@ public enum GameTypeDetector {
     }
 
     /// 返回针对该框架的性能优化启动参数
-    /// NW.js/Electron 游戏使用 builtin wined3d（ANGLE→wined3d→Vulkan→MoltenVK→Metal），
-    /// GPU 渲染帧率更高，不再需要 --disable-gpu 软件渲染
+    /// NW.js/Electron 游戏的输入延迟问题由 --in-process-gpu 引起，
+    /// 解决方案是通过修改 package.json 移除该标志（见 patchNWJSPackageJson），
+    /// 让 GPU 在独立进程中运行，Browser 主线程专职处理输入事件。
+    /// 此处不再添加额外 Chromium 参数，避免 --disable-gpu-compositing 造成
+    /// GPU→CPU 内存回读（会反过来占满 Browser 主线程导致同样的输入延迟）。
     public static func performanceArgs(for framework: GameFramework) -> [String] {
-        // 所有框架类型都使用 GPU 渲染，不再强制 --disable-gpu
         return []
     }
 

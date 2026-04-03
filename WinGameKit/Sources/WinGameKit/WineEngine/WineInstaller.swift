@@ -32,62 +32,17 @@ public class WineInstaller {
     /// URL to the installed `wine` `bin` directory
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
-    // MARK: - CrossOver Wine 检测
-
-    /// CrossOver.app 可能的安装路径
-    private static let crossoverSearchPaths = [
-        "/Applications/CrossOver.app",
-        NSHomeDirectory() + "/Applications/CrossOver.app"
-    ]
-
-    /// 检测 CrossOver 是否已安装，返回 .app 路径
-    public static func crossoverAppPath() -> String? {
-        for path in crossoverSearchPaths where FileManager.default.fileExists(atPath: path) {
-            return path
-        }
-        return nil
-    }
-
-    /// CrossOver 是否已安装
-    public static func isCrossoverInstalled() -> Bool {
-        return crossoverAppPath() != nil
-    }
-
-    /// CrossOver 内部资源根路径
-    public static func crossoverBasePath() -> URL? {
-        guard let appPath = crossoverAppPath() else { return nil }
-        return URL(fileURLWithPath: appPath)
-            .appending(path: "Contents/SharedSupport/CrossOver")
-    }
-
-    /// CrossOver Wine 二进制文件夹（含 wineloader、wineserver）
-    public static func crossoverBinFolder() -> URL? {
-        return crossoverBasePath()?.appending(path: "CrossOver-Hosted Application")
-    }
-
-    /// CrossOver D3DMetal 组件路径（apple_gptk）
-    public static func crossoverD3DMetalFolder() -> URL? {
-        return crossoverBasePath()?.appending(path: "lib64/apple_gptk")
-    }
-
-    /// 将 CrossOver D3DMetal DLL 安装到指定 Bottle 的 system32
-    public static func installCrossoverD3DMetal(to bottleURL: URL) throws {
-        guard let d3dFolder = crossoverD3DMetalFolder() else { return }
-        try installD3DMetalStubs(to: bottleURL, from: d3dFolder.appending(path: "wine/x86_64-windows"))
-    }
+    // MARK: - D3DMetal PE Stub 安装
 
     /// 将 D3DMetal PE stub DLL 安装到 Bottle 的 system32
-    /// 来源优先级：CrossOver apple_gptk → 无（保持 wined3d）
+    /// 来源：Wine tarball 内置的 Libraries/Wine/lib/wine/x86_64-windows/
     public static func installD3DMetalStubs(to bottleURL: URL) throws {
-        // 优先从 CrossOver 获取 D3DMetal PE stub
-        if let d3dFolder = crossoverD3DMetalFolder() {
-            try installD3DMetalStubs(
-                to: bottleURL,
-                from: d3dFolder.appending(path: "wine/x86_64-windows")
-            )
-            return
+        let srcDir = libraryFolder
+            .appending(path: "Wine/lib/wine/x86_64-windows")
+        guard FileManager.default.fileExists(atPath: srcDir.path(percentEncoded: false)) else {
+            return  // Wine 未安装，跳过
         }
-        // 无可用来源 — 保持 wined3d
+        try installD3DMetalStubs(to: bottleURL, from: srcDir)
     }
 
     /// 从指定路径安装 D3DMetal PE stub DLL
@@ -172,8 +127,7 @@ public class WineInstaller {
 
     public static func shouldUpdateWine() async -> (Bool, SemanticVersion) {
         // swiftlint:disable:next line_length
-        // MVP 阶段：使用 Bourbon 的版本信息，后续替换为 WinGameRun 自己的 Release
-        let versionPlistURL = "https://raw.githubusercontent.com/leonewt0n/Bourbon/refs/heads/main/WhiskyWineVersion.plist"
+        let versionPlistURL = "https://raw.githubusercontent.com/rorojiao/WinGameRun/refs/heads/main/WineVersion.plist"
         let localVersion = wineVersion()
 
         guard let remoteUrl = URL(string: versionPlistURL) else {
